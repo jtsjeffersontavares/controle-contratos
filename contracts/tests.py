@@ -271,6 +271,86 @@ class ViewAndPermissionTests(TestCase):
         self.assertEqual(procurement_response.status_code, 200)
         self.assertNotContains(procurement_response, 'OM do termo de referência')
 
+    def test_contract_create_uses_procurement_object_and_hides_removed_fields(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA CONTRATO NOVO')
+        org = Organization.objects.create(acronym='OM-CNT', name='OM Contrato')
+        procurement = Procurement.objects.create(number='93000/2026', object='Objeto base do pregão')
+        ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            nomenclature='Item A',
+            specification='Especificação A',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value_estimate=Decimal('10'),
+        )
+        create_response = self.client.get(reverse('contract_create'))
+        self.assertEqual(create_response.status_code, 200)
+        self.assertNotContains(create_response, 'OM gestora')
+        self.assertNotContains(create_response, 'Pregão/contratação')
+
+        post_response = self.client.post(reverse('contract_create'), {
+            'number': '200/NOVO/2026',
+            'object': '',
+            'supplier': supplier.pk,
+            'procurement': procurement.pk,
+            'process_number': 'PROC-2026',
+            'subprocess_number': 'SUB-1',
+            'law': Contract.Law.LAW_14133,
+            'status': Contract.Status.DRAFT,
+            'initial_value': '10',
+            'current_value': '10',
+            'manager': '',
+            'substitute_manager': '',
+            'technical_inspector': '',
+            'substitute_inspector': '',
+            'signature_date': '',
+            'start_date': '',
+            'end_date': '',
+            'notes': '',
+        })
+        self.assertEqual(post_response.status_code, 302)
+        contract = Contract.objects.get(number='200/NOVO/2026')
+        self.assertIn('Item A', contract.object)
+        self.assertEqual(contract.procurement, procurement)
+
+    def test_contract_item_create_shows_only_procurement_items_of_contract(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA ITEM CONTRATUAL')
+        org = Organization.objects.create(acronym='OM-ITM', name='OM Item')
+        procurement_a = Procurement.objects.create(number='94000/2026')
+        procurement_b = Procurement.objects.create(number='95000/2026')
+        item_a = ProcurementItem.objects.create(
+            procurement=procurement_a,
+            item_number='1',
+            specification='Item do pregão A',
+            quantity=Decimal('2'),
+            unit='UN',
+            unit_value_estimate=Decimal('10'),
+        )
+        ProcurementItem.objects.create(
+            procurement=procurement_b,
+            item_number='1',
+            specification='Item do pregão B',
+            quantity=Decimal('3'),
+            unit='UN',
+            unit_value_estimate=Decimal('20'),
+        )
+        contract = Contract.objects.create(
+            number='201/ITEM/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement_a,
+            initial_value=Decimal('20'),
+            current_value=Decimal('20'),
+        )
+        response = self.client.get(reverse('item_create') + f'?contract={contract.pk}')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Item do pregão A')
+        self.assertNotContains(response, 'Item do pregão B')
+        self.assertContains(response, 'readonly')
+
     def test_supply_order_edit_filters_items_by_contract_and_shows_procurement_locations(self):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA ORD')
@@ -331,6 +411,63 @@ class ViewAndPermissionTests(TestCase):
         self.assertContains(response, str(valid_item.pk))
         self.assertNotContains(response, 'Item de outro contrato')
         self.assertContains(response, 'OMs de referência do item do pregão')
+        self.assertContains(response, 'item-locations-map')
+        self.assertContains(response, 'order-items-url-template')
+
+    def test_contract_order_items_endpoint_returns_only_contract_items(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA ENDPOINT')
+        org = Organization.objects.create(acronym='OM-END', name='OM Endpoint')
+        dest = Organization.objects.create(acronym='OM-REF', name='OM Referencia')
+        procurement = Procurement.objects.create(number='96000/2026')
+        procurement_item = ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='10',
+            specification='Item endpoint',
+            quantity=Decimal('4'),
+            unit='UN',
+            unit_value_estimate=Decimal('10'),
+        )
+        ProcurementItemDelivery.objects.create(item=procurement_item, destination=dest, quantity=Decimal('2'))
+
+        contract_a = Contract.objects.create(
+            number='301/END/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement,
+            initial_value=Decimal('40'),
+            current_value=Decimal('40'),
+        )
+        contract_b = Contract.objects.create(
+            number='302/END/2026',
+            supplier=supplier,
+            managing_organization=org,
+            initial_value=Decimal('10'),
+            current_value=Decimal('10'),
+        )
+        item_a = contract_a.items.create(
+            procurement_item='10',
+            origin_procurement_item=procurement_item,
+            description='Item A',
+            quantity=Decimal('4'),
+            unit='UN',
+            unit_value=Decimal('10'),
+        )
+        contract_b.items.create(
+            procurement_item='99',
+            description='Item B',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value=Decimal('10'),
+        )
+
+        response = self.client.get(reverse('contract_order_items', args=[contract_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['contractId'], contract_a.pk)
+        self.assertEqual(len(payload['items']), 1)
+        self.assertEqual(payload['items'][0]['id'], item_a.pk)
+        self.assertIn('OM-REF', payload['items'][0]['locationsText'])
 
     def test_procurement_item_form_rejects_planned_quantity_above_item_quantity(self):
         self.client.login(username='gestor', password='SenhaForte123!')

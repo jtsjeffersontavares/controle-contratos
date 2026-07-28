@@ -14,6 +14,7 @@ from django.forms.utils import ErrorList
 from django.db.models import Q, Sum
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -207,6 +208,31 @@ class ContractCreateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin
     template_name = 'contracts/form.html'
     title = 'Novo contrato'
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields.pop('procurement_number', None)
+        form.fields.pop('managing_organization', None)
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['contract_create_mode'] = True
+        context['procurement_summary_url_template'] = reverse('procurement_summary', args=[0]).replace('/0/', '/__id__/')
+        return context
+
+    def form_valid(self, form):
+        procurement = form.cleaned_data.get('procurement')
+        if procurement:
+            items = list(procurement.items.all())
+            if items:
+                form.instance.object = '; '.join(
+                    (item.nomenclature or item.specification or f'Item {item.item_number}')
+                    for item in items[:8]
+                )
+            elif procurement.object:
+                form.instance.object = procurement.object
+        return super().form_valid(form)
+
 
 class ContractUpdateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin, UpdateView):
     model = Contract
@@ -272,6 +298,61 @@ class ProcurementDeleteView(LoginRequiredMixin, ManagerRequiredMixin, DeleteView
     def form_valid(self, form):
         messages.success(self.request, 'Pregão excluído.')
         return super().form_valid(form)
+
+
+class ProcurementSummaryView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        procurement = get_object_or_404(Procurement.objects.prefetch_related('items__delivery_locations__destination'), pk=pk)
+        items = []
+        for item in procurement.items.all():
+            deliveries = [
+                {
+                    'destination': delivery.destination.acronym,
+                    'quantity': str(delivery.quantity),
+                }
+                for delivery in item.delivery_locations.all()
+            ]
+            items.append({
+                'id': item.pk,
+                'item_number': item.item_number,
+                'title': item.nomenclature or item.specification or f'Item {item.item_number}',
+                'code': item.code,
+                'quantity': str(item.quantity),
+                'unit': item.unit,
+                'deliveries': deliveries,
+            })
+        payload = {
+            'id': procurement.pk,
+            'number': procurement.number,
+            'object': procurement.object,
+            'items': items,
+        }
+        return JsonResponse(payload)
+
+
+class ContractOrderItemsView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        contract = get_object_or_404(Contract, pk=pk)
+        items = []
+        queryset = contract.items.select_related('origin_procurement_item').all()
+        for item in queryset:
+            locations = []
+            if item.origin_procurement_item_id:
+                locations = list(
+                    item.origin_procurement_item.delivery_locations.select_related('destination').values_list(
+                        'destination__acronym', 'quantity'
+                    )
+                )
+            refs = ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations)
+            title = item.nomenclature or item.description[:40]
+            label = f'{contract.number} — Item {item.procurement_item or "s/n"} — {title}'
+            items.append({
+                'id': item.pk,
+                'label': label,
+                'procurementItem': item.procurement_item or '',
+                'locationsText': refs,
+            })
+        return JsonResponse({'contractId': contract.pk, 'items': items})
 
 
 class ProcurementItemFormMixin(LoginRequiredMixin, EditorRequiredMixin, FormMetaMixin):
@@ -479,12 +560,42 @@ class RelatedUpdateView(LoginRequiredMixin, EditorRequiredMixin, FormMetaMixin, 
         return reverse('dashboard')
 
 
-class ItemCreateView(RelatedCreateView): model = ContractItem; form_class = ContractItemForm; title = 'Novo item contratual'
-class ItemUpdateView(RelatedUpdateView): model = ContractItem; form_class = ContractItemForm; title = 'Editar item contratual'
+class ItemCreateView(RelatedCreateView):
+    model = ContractItem
+    form_class = ContractItemForm
+    title = 'Novo item contratual'
+
+
+class ItemUpdateView(RelatedUpdateView):
+    model = ContractItem
+    form_class = ContractItemForm
+    title = 'Editar item contratual'
 class CommitmentCreateView(RelatedCreateView): model = Commitment; form_class = CommitmentForm; title = 'Nova nota de empenho'
 class CommitmentUpdateView(RelatedUpdateView): model = Commitment; form_class = CommitmentForm; title = 'Editar nota de empenho'
-class SupplyOrderCreateView(RelatedCreateView): model = SupplyOrder; form_class = SupplyOrderForm; title = 'Nova ordem de fornecimento'
-class SupplyOrderUpdateView(RelatedUpdateView): model = SupplyOrder; form_class = SupplyOrderForm; title = 'Editar ordem de fornecimento'
+class SupplyOrderCreateView(RelatedCreateView):
+    model = SupplyOrder
+    form_class = SupplyOrderForm
+    title = 'Nova ordem de fornecimento'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context.get('form')
+        context['item_locations_map'] = getattr(form, 'item_locations_map', {})
+        context['order_items_url_template'] = reverse('contract_order_items', args=[0]).replace('/0/', '/__id__/')
+        return context
+
+
+class SupplyOrderUpdateView(RelatedUpdateView):
+    model = SupplyOrder
+    form_class = SupplyOrderForm
+    title = 'Editar ordem de fornecimento'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context.get('form')
+        context['item_locations_map'] = getattr(form, 'item_locations_map', {})
+        context['order_items_url_template'] = reverse('contract_order_items', args=[0]).replace('/0/', '/__id__/')
+        return context
 class DeliveryCreateView(RelatedCreateView): model = Delivery; form_class = DeliveryForm; title = 'Registrar entrega'
 class DeliveryUpdateView(RelatedUpdateView): model = Delivery; form_class = DeliveryForm; title = 'Editar entrega'
 class ChangeCreateView(RelatedCreateView): model = ContractChange; form_class = ContractChangeForm; title = 'Nova alteração contratual'

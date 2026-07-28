@@ -49,7 +49,6 @@ class ContractForm(StyledModelForm):
             'signature_date': DATE_WIDGET,
             'start_date': DATE_WIDGET,
             'end_date': DATE_WIDGET,
-            'guarantee_end': DATE_WIDGET,
         }
 
     def clean(self):
@@ -92,6 +91,36 @@ class ContractItemForm(StyledModelForm):
             'nomenclature', 'description', 'quantity', 'unit', 'unit_value',
         ]
         widgets = {'description': TEXTAREA_WIDGET}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        posted_contract = self.data.get(self.add_prefix('contract')) if self.is_bound else None
+        contract = posted_contract or self.initial.get('contract') or getattr(self.instance, 'contract', None)
+        contract_id = getattr(contract, 'id', contract)
+        queryset = ProcurementItem.objects.none()
+        if contract_id:
+            contract_obj = Contract.objects.select_related('procurement').filter(pk=contract_id).first()
+            if contract_obj and contract_obj.procurement_id:
+                queryset = ProcurementItem.objects.filter(procurement_id=contract_obj.procurement_id)
+                self.fields['origin_procurement_item'].required = True
+                self.fields['origin_procurement_item'].help_text = 'Selecione um item do pregão vinculado ao contrato.'
+            else:
+                self.fields['origin_procurement_item'].help_text = 'O contrato não possui pregão vinculado.'
+        self.fields['origin_procurement_item'].queryset = queryset
+        self.fields['procurement_item'].widget.attrs['readonly'] = 'readonly'
+
+    def clean(self):
+        cleaned = super().clean()
+        contract = cleaned.get('contract')
+        origin_item = cleaned.get('origin_procurement_item')
+        if contract and contract.procurement_id:
+            if not origin_item:
+                self.add_error('origin_procurement_item', 'Selecione um item do pregão vinculado ao contrato.')
+            elif origin_item.procurement_id != contract.procurement_id:
+                self.add_error('origin_procurement_item', 'O item selecionado não pertence ao pregão do contrato.')
+            else:
+                cleaned['procurement_item'] = origin_item.item_number
+        return cleaned
 
 
 class ProcurementForm(StyledModelForm):
@@ -171,11 +200,21 @@ class SupplyOrderForm(StyledModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        contract = self.initial.get('contract') or getattr(self.instance, 'contract', None)
+        self.item_locations_map = {}
+        posted_contract = self.data.get(self.add_prefix('contract')) if self.is_bound else None
+        contract = posted_contract or self.initial.get('contract') or getattr(self.instance, 'contract', None)
         contract_id = getattr(contract, 'id', contract)
         if contract_id:
             queryset = ContractItem.objects.filter(contract_id=contract_id).select_related('origin_procurement_item')
             self.fields['item'].queryset = queryset
+            for item in queryset:
+                locations = []
+                if item.origin_procurement_item_id:
+                    locations = list(
+                        item.origin_procurement_item.delivery_locations.select_related('destination').values_list('destination__acronym', 'quantity')
+                    )
+                refs = ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations) if locations else ''
+                self.item_locations_map[str(item.pk)] = refs
 
         posted_item_id = None
         if self.is_bound:

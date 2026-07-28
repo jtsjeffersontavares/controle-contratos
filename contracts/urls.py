@@ -12,6 +12,7 @@ urlpatterns = [
     path('pregoes/<int:pk>/', views.ProcurementDetailView.as_view(), name='procurement_detail'),
     path('pregoes/<int:pk>/editar/', views.ProcurementUpdateView.as_view(), name='procurement_update'),
     path('pregoes/<int:pk>/excluir/', views.ProcurementDeleteView.as_view(), name='procurement_delete'),
+    path('pregoes/<int:pk>/resumo/', views.ProcurementSummaryView.as_view(), name='procurement_summary'),
     path('pregoes/itens/novo/', views.ProcurementItemCreateView.as_view(), name='procurement_item_create'),
     path('pregoes/itens/<int:pk>/editar/', views.ProcurementItemUpdateView.as_view(), name='procurement_item_update'),
     path('pregoes/itens/<int:pk>/excluir/', views.ProcurementItemDeleteView.as_view(), name='procurement_item_delete'),
@@ -19,6 +20,7 @@ urlpatterns = [
     path('contratos/', views.ContractListView.as_view(), name='contract_list'),
     path('contratos/novo/', views.ContractCreateView.as_view(), name='contract_create'),
     path('contratos/<int:pk>/', views.ContractDetailView.as_view(), name='contract_detail'),
+    path('contratos/<int:pk>/itens-ordem/', views.ContractOrderItemsView.as_view(), name='contract_order_items'),
     path('contratos/<int:pk>/editar/', views.ContractUpdateView.as_view(), name='contract_update'),
     path('contratos/<int:pk>/excluir/', views.ContractDeleteView.as_view(), name='contract_delete'),
 

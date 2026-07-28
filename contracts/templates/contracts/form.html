@@ -4,6 +4,154 @@
 <form method="post" enctype="multipart/form-data" class="panel form-panel">{% csrf_token %}
   {% if form.non_field_errors %}<div class="message error">{{ form.non_field_errors }}</div>{% endif %}
   <div class="form-grid">{% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+  {% if contract_create_mode %}
+    <div class="panel" style="margin-top:14px">
+      <h2 style="margin-top:0">Itens do pregão selecionado</h2>
+      <ul id="procurement-items-preview" class="record-list"><li class="empty">Selecione um pregão para visualizar os itens.</li></ul>
+    </div>
+  {% endif %}
   <div class="form-actions"><a class="button" href="{{ cancel_url }}">Cancelar</a><button class="button primary" type="submit">Salvar</button></div>
 </form>
+{% if item_locations_map %}
+  {{ item_locations_map|json_script:'item-locations-map' }}
+{% endif %}
+{% if order_items_url_template %}
+  <script id="order-items-url-template" type="application/json">"{{ order_items_url_template|escapejs }}"</script>
+{% endif %}
+{% if contract_create_mode %}
+  <script id="procurement-summary-url-template" type="application/json">"{{ procurement_summary_url_template|escapejs }}"</script>
+{% endif %}
+<script>
+(() => {
+  const itemSelect = document.getElementById('id_item');
+  const contractSelect = document.getElementById('id_contract');
+  const destinationHelp = document.getElementById('id_destination_helptext');
+  const itemLocationsRaw = document.getElementById('item-locations-map');
+  if (itemSelect && destinationHelp) {
+    const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
+    const defaultText = destinationHelp.textContent || '';
+    const refreshDestinationHelp = () => {
+      const selected = itemSelect.value;
+      const refs = itemLocationsMap[selected] || '';
+      destinationHelp.textContent = refs
+        ? `OMs de referência do item do pregão: ${refs}. Você pode selecionar outra OM destino.`
+        : defaultText;
+    };
+
+    const orderItemsTemplateRaw = document.getElementById('order-items-url-template');
+    if (contractSelect && orderItemsTemplateRaw) {
+      const template = JSON.parse(orderItemsTemplateRaw.textContent || '""');
+      const replaceItemOptions = (items) => {
+        const currentValue = itemSelect.value;
+        itemSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '---------';
+        itemSelect.appendChild(placeholder);
+        const newMap = {};
+        for (const item of items) {
+          const option = document.createElement('option');
+          option.value = String(item.id);
+          option.textContent = item.label;
+          if (String(item.id) === currentValue) {
+            option.selected = true;
+          }
+          itemSelect.appendChild(option);
+          newMap[String(item.id)] = item.locationsText || '';
+        }
+        Object.keys(itemLocationsMap).forEach((key) => delete itemLocationsMap[key]);
+        Object.assign(itemLocationsMap, newMap);
+      };
+
+      const loadItemsByContract = async () => {
+        const contractId = contractSelect.value;
+        if (!contractId) {
+          replaceItemOptions([]);
+          refreshDestinationHelp();
+          return;
+        }
+        const url = template.replace('__id__', contractId);
+        try {
+          const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          if (!response.ok) throw new Error('Falha ao carregar itens do contrato');
+          const data = await response.json();
+          replaceItemOptions(data.items || []);
+        } catch (_error) {
+          replaceItemOptions([]);
+        }
+        refreshDestinationHelp();
+      };
+
+      contractSelect.addEventListener('change', loadItemsByContract);
+      if (!itemSelect.options.length || itemSelect.options.length <= 1) {
+        loadItemsByContract();
+      }
+    }
+
+    itemSelect.addEventListener('change', refreshDestinationHelp);
+    refreshDestinationHelp();
+  }
+
+  const originItemSelect = document.getElementById('id_origin_procurement_item');
+  const procurementItemInput = document.getElementById('id_procurement_item');
+  if (originItemSelect && procurementItemInput) {
+    const syncProcurementItemNumber = () => {
+      const option = originItemSelect.options[originItemSelect.selectedIndex];
+      if (!option || !option.text) {
+        procurementItemInput.value = '';
+        return;
+      }
+      const match = option.text.match(/Item\s+([^\s—-]+)/i);
+      procurementItemInput.value = match ? match[1] : '';
+    };
+    originItemSelect.addEventListener('change', syncProcurementItemNumber);
+    syncProcurementItemNumber();
+  }
+
+  const contractCreateMarker = document.getElementById('procurement-summary-url-template');
+  if (contractCreateMarker) {
+    const procurementSelect = document.getElementById('id_procurement');
+    const objectInput = document.getElementById('id_object');
+    const preview = document.getElementById('procurement-items-preview');
+    const templateUrl = JSON.parse(contractCreateMarker.textContent || '""');
+    const renderItems = (items) => {
+      if (!preview) return;
+      if (!items.length) {
+        preview.innerHTML = '<li class="empty">Este pregão não possui itens cadastrados.</li>';
+        return;
+      }
+      preview.innerHTML = items.map((item) => {
+        const deliveries = (item.deliveries || []).map((delivery) => `${delivery.destination} (${delivery.quantity})`).join(', ');
+        const subtitle = deliveries ? `OMs: ${deliveries}` : 'Sem OMs de referência cadastradas';
+        return `<li><div><strong>Item ${item.item_number}${item.code ? ` · ${item.code}` : ''}</strong><span>${item.title}</span><small>${subtitle}</small></div></li>`;
+      }).join('');
+    };
+    const updateFromProcurement = async () => {
+      const procurementId = procurementSelect?.value;
+      if (!procurementId) {
+        if (preview) preview.innerHTML = '<li class="empty">Selecione um pregão para visualizar os itens.</li>';
+        return;
+      }
+      const url = templateUrl.replace('__id__', procurementId);
+      try {
+        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('Falha ao carregar pregão');
+        const data = await response.json();
+        if (objectInput) {
+          if (data.items?.length) {
+            objectInput.value = data.items.slice(0, 8).map((item) => item.title).join('; ');
+          } else if (data.object) {
+            objectInput.value = data.object;
+          }
+        }
+        renderItems(data.items || []);
+      } catch (_error) {
+        if (preview) preview.innerHTML = '<li class="empty">Não foi possível carregar os itens do pregão.</li>';
+      }
+    };
+    procurementSelect?.addEventListener('change', updateFromProcurement);
+    updateFromProcurement();
+  }
+})();
+</script>
 {% endblock %}
