@@ -67,3 +67,7 @@ python manage.py backup_system
 ## Observação sobre dados
 
 Nenhum dado real da planilha fornecida acompanha o pacote. O arquivo foi utilizado apenas para validar a modelagem e o importador. A inclusão dos dados ocorre dentro do sistema, após login e revisão da prévia.
+
+## Backlog técnico
+
+As pendências priorizadas e o status recente de evolução estão em `docs/TAREFAS_PENDENTES.md`.

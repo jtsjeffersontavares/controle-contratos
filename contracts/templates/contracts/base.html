@@ -24,6 +24,7 @@
     <aside class="sidebar" data-sidebar>
       <nav>
         <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Painel</a>
+        <a href="{% url 'procurement_list' %}">Pregões</a>
         <a href="{% url 'contract_list' %}">Contratos</a>
         <a href="{% url 'commitment_list' %}">Empenhos</a>
         <a href="{% url 'supplyorder_list' %}">Ordens de fornecimento</a>

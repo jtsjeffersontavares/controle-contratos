@@ -12,6 +12,9 @@ from .models import (
     ImportBatch,
     Organization,
     Person,
+    Procurement,
+    ProcurementItem,
+    ProcurementItemDelivery,
     Supplier,
     SupplyOrder,
 )
@@ -26,6 +29,11 @@ class ContractItemInline(admin.TabularInline):
     extra = 0
 
 
+class ProcurementItemInline(admin.TabularInline):
+    model = ProcurementItem
+    extra = 0
+
+
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
     list_display = ('number', 'supplier', 'status', 'start_date', 'end_date', 'current_value')
@@ -33,6 +41,14 @@ class ContractAdmin(admin.ModelAdmin):
     search_fields = ('number', 'object', 'supplier__name', 'process_number', 'procurement_number')
     autocomplete_fields = ('supplier', 'managing_organization', 'reference_organization', 'manager', 'substitute_manager')
     inlines = [ContractItemInline]
+
+
+@admin.register(Procurement)
+class ProcurementAdmin(admin.ModelAdmin):
+    list_display = ('number', 'requesting_organization', 'status', 'opening_date')
+    list_filter = ('status', 'law', 'requesting_organization')
+    search_fields = ('number', 'object')
+    inlines = [ProcurementItemInline]
 
 
 @admin.register(Supplier)
@@ -78,6 +94,12 @@ class DeliveryAdmin(admin.ModelAdmin):
 
 for model in [ContractChange, AdministrativeProcess, Document, ImportBatch]:
     admin.site.register(model)
+
+
+@admin.register(ProcurementItemDelivery)
+class ProcurementItemDeliveryAdmin(admin.ModelAdmin):
+    list_display = ('item', 'destination', 'quantity')
+    search_fields = ('item__procurement__number', 'item__item_number', 'destination__acronym')
 
 
 @admin.register(AuditLog)

@@ -7,9 +7,19 @@ urlpatterns = [
     path('', views.DashboardView.as_view(), name='dashboard'),
     path('ajuda/', views.HelpView.as_view(), name='help'),
 
+    path('pregoes/', views.ProcurementListView.as_view(), name='procurement_list'),
+    path('pregoes/novo/', views.ProcurementCreateView.as_view(), name='procurement_create'),
+    path('pregoes/<int:pk>/', views.ProcurementDetailView.as_view(), name='procurement_detail'),
+    path('pregoes/<int:pk>/editar/', views.ProcurementUpdateView.as_view(), name='procurement_update'),
+    path('pregoes/<int:pk>/excluir/', views.ProcurementDeleteView.as_view(), name='procurement_delete'),
+    path('pregoes/itens/novo/', views.ProcurementItemCreateView.as_view(), name='procurement_item_create'),
+    path('pregoes/itens/<int:pk>/editar/', views.ProcurementItemUpdateView.as_view(), name='procurement_item_update'),
+    path('pregoes/itens/<int:pk>/excluir/', views.ProcurementItemDeleteView.as_view(), name='procurement_item_delete'),
+
     path('contratos/', views.ContractListView.as_view(), name='contract_list'),
     path('contratos/novo/', views.ContractCreateView.as_view(), name='contract_create'),
     path('contratos/<int:pk>/', views.ContractDetailView.as_view(), name='contract_detail'),
+    path('contratos/<int:pk>/copiar-itens-pregao/', views.ContractCopyProcurementItemsView.as_view(), name='contract_copy_procurement_items'),
     path('contratos/<int:pk>/editar/', views.ContractUpdateView.as_view(), name='contract_update'),
     path('contratos/<int:pk>/excluir/', views.ContractDeleteView.as_view(), name='contract_delete'),
 
@@ -60,4 +70,7 @@ urlpatterns = [
     path('relatorios/contratos.csv', views.ExportContractsCsvView.as_view(), name='export_contracts_csv'),
     path('relatorios/contratos.xlsx', views.ExportContractsXlsxView.as_view(), name='export_contracts_xlsx'),
     path('relatorios/contratos.pdf', views.ExportContractsPdfView.as_view(), name='export_contracts_pdf'),
+    path('relatorios/pregoes.csv', views.ExportProcurementsCsvView.as_view(), name='export_procurements_csv'),
+    path('relatorios/pregoes.xlsx', views.ExportProcurementsXlsxView.as_view(), name='export_procurements_xlsx'),
+    path('relatorios/pregoes.pdf', views.ExportProcurementsPdfView.as_view(), name='export_procurements_pdf'),
 ]

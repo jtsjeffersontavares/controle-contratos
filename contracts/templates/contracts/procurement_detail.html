@@ -1,0 +1,79 @@
+{% extends 'contracts/base.html' %}
+{% load contracts_extras %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">Pregão</div>
+    <h1>{{ procurement.number }}</h1>
+    <p>{{ procurement.requesting_organization|default:'Sem OM requisitante' }}</p>
+  </div>
+  <div class="button-group">
+    {% if can_manage %}<a class="button" href="{% url 'procurement_update' procurement.pk %}">Editar</a>{% endif %}
+    <a class="button" href="{% url 'procurement_list' %}">Voltar</a>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel-heading">
+    <h2>Itens do pregão</h2>
+    {% if can_edit %}<a href="{% url 'procurement_item_create' %}?procurement={{ procurement.pk }}">+ Adicionar item</a>{% endif %}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>TDV</th>
+          <th>Especificação</th>
+          <th>Qtd.</th>
+          <th>Valor unit.</th>
+          <th>Locais de entrega</th>
+          <th>Contratado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in procurement.items.all %}
+          <tr>
+            <td>{{ item.item_number }}</td>
+            <td>{{ item.code|default:'—' }}</td>
+            <td>{{ item.nomenclature|default:item.specification }}<small>{{ item.specification }}</small></td>
+            <td>{{ item.quantity|decimal_pt }} {{ item.unit }}</td>
+            <td>{{ item.unit_value_estimate|brl }}</td>
+            <td>
+              {% for delivery in item.delivery_locations.all %}
+                <span class="badge">{{ delivery.destination.acronym }}: {{ delivery.quantity|decimal_pt }}</span>
+              {% empty %}
+                —
+              {% endfor %}
+            </td>
+            <td>{{ item.contracted_quantity|decimal_pt }}</td>
+            <td class="actions">
+              {% if can_edit %}
+                <a href="{% url 'procurement_item_update' item.pk %}">Editar</a>
+                <a class="danger-link" href="{% url 'procurement_item_delete' item.pk %}">Excluir</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="empty">Nenhum item cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading"><h2>Contratos vinculados</h2></div>
+  <ul class="record-list">
+    {% for contract in procurement.contracts.all %}
+      <li>
+        <div><strong>{{ contract.number }}</strong><span>{{ contract.supplier.name }}</span></div>
+        <a href="{{ contract.get_absolute_url }}">Abrir</a>
+      </li>
+    {% empty %}
+      <li class="empty">Nenhum contrato vinculado a este pregão.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

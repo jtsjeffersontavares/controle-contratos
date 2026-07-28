@@ -10,6 +10,9 @@ from .models import (
     Document,
     Organization,
     Person,
+    Procurement,
+    ProcurementItem,
+    ProcurementItemDelivery,
     Supplier,
     SupplyOrder,
 )
@@ -30,11 +33,19 @@ class StyledModelForm(forms.ModelForm):
 
 
 class ContractForm(StyledModelForm):
+    copy_items_from_procurement = forms.BooleanField(
+        label='Copiar itens do pregão para o contrato',
+        required=False,
+        initial=True,
+        help_text='Cria os itens do contrato a partir dos itens cadastrados no pregão selecionado.',
+    )
+
     class Meta:
         model = Contract
         fields = [
             'number', 'object', 'supplier', 'managing_organization', 'reference_organization',
             'manager', 'substitute_manager', 'technical_inspector', 'substitute_inspector',
+            'procurement',
             'procurement_number', 'process_number', 'subprocess_number', 'law', 'status',
             'signature_date', 'start_date', 'end_date', 'guarantee_end',
             'initial_value', 'current_value', 'notes',
@@ -79,8 +90,38 @@ class SupplierForm(StyledModelForm):
 class ContractItemForm(StyledModelForm):
     class Meta:
         model = ContractItem
-        fields = ['contract', 'procurement_item', 'code', 'nomenclature', 'description', 'quantity', 'unit', 'unit_value']
+        fields = [
+            'contract', 'procurement_item', 'origin_procurement_item', 'code',
+            'nomenclature', 'description', 'quantity', 'unit', 'unit_value',
+        ]
         widgets = {'description': TEXTAREA_WIDGET}
+
+
+class ProcurementForm(StyledModelForm):
+    class Meta:
+        model = Procurement
+        fields = ['number', 'object', 'requesting_organization', 'law', 'opening_date', 'status', 'notes']
+        widgets = {
+            'object': forms.Textarea(attrs={'rows': 4}),
+            'notes': TEXTAREA_WIDGET,
+            'opening_date': DATE_WIDGET,
+        }
+
+
+class ProcurementItemForm(StyledModelForm):
+    class Meta:
+        model = ProcurementItem
+        fields = ['procurement', 'item_number', 'code', 'nomenclature', 'specification', 'quantity', 'unit', 'unit_value_estimate']
+        widgets = {'specification': TEXTAREA_WIDGET}
+
+
+ProcurementItemDeliveryFormSet = forms.inlineformset_factory(
+    ProcurementItem,
+    ProcurementItemDelivery,
+    fields=['destination', 'quantity', 'notes'],
+    extra=3,
+    can_delete=True,
+)
 
 
 class CommitmentForm(StyledModelForm):

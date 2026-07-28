@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .import_service import import_preview, preview_workbook
-from .models import Contract, Delivery, Document, Organization, Supplier, SupplyOrder
+from .models import Contract, Delivery, Document, Organization, Procurement, ProcurementItem, ProcurementItemDelivery, Supplier, SupplyOrder
 from .xlsx_utils import read_xlsx_sheet, write_simple_xlsx
 
 
@@ -56,6 +56,11 @@ class ImportTests(TestCase):
         self.assertEqual(SupplyOrder.objects.count(), 1)
         self.assertEqual(Delivery.objects.count(), 1)
         self.assertEqual(Contract.objects.get().current_value, Decimal('200000'))
+        self.assertEqual(Procurement.objects.count(), 1)
+        self.assertEqual(ProcurementItem.objects.count(), 1)
+        self.assertEqual(ProcurementItemDelivery.objects.count(), 1)
+        contract = Contract.objects.get()
+        self.assertIsNotNone(contract.procurement)
 
     def test_preview_rejects_missing_required_columns(self):
         file = SimpleUploadedFile('invalida.xlsx', write_simple_xlsx(['PAG'], [['x']], 'Planilha1'))
@@ -77,6 +82,36 @@ class ContractModelTests(TestCase):
         self.assertEqual(contract.calculated_status, Contract.Status.EXPIRING)
         self.assertEqual(contract.days_to_expiry, 30)
 
+    def test_copy_items_from_procurement(self):
+        procurement = Procurement.objects.create(number='90000/2026')
+        procurement_item = ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            code='P-1/01A-DTS',
+            nomenclature='VEICULO',
+            specification='MODELO TESTE',
+            quantity=Decimal('2'),
+            unit='UN',
+            unit_value_estimate=Decimal('100000'),
+        )
+        contract = Contract.objects.create(
+            number='010/COPIA/2026',
+            supplier=self.supplier,
+            managing_organization=self.org,
+            procurement=procurement,
+            initial_value=Decimal('200000'),
+            current_value=Decimal('200000'),
+        )
+
+        copied = contract.copy_items_from_procurement()
+        self.assertEqual(copied, 1)
+        item = contract.items.get()
+        self.assertEqual(item.origin_procurement_item, procurement_item)
+        self.assertEqual(item.quantity, Decimal('2'))
+
+        copied_again = contract.copy_items_from_procurement()
+        self.assertEqual(copied_again, 0)
+
 
 class ViewAndPermissionTests(TestCase):
     def setUp(self):
@@ -84,6 +119,7 @@ class ViewAndPermissionTests(TestCase):
         self.gestor = User.objects.create_user('gestor', password='SenhaForte123!')
         group = Group.objects.create(name='Gestor')
         self.gestor.groups.add(group)
+        Group.objects.get_or_create(name='Fiscal')
 
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse('dashboard'))
@@ -128,6 +164,15 @@ class ViewAndPermissionTests(TestCase):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA RELATÓRIO')
         org = Organization.objects.create(acronym='OM-REL', name='OM Relatório')
+        procurement = Procurement.objects.create(number='91000/2026', requesting_organization=org)
+        ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            specification='Item relatório',
+            quantity=Decimal('2'),
+            unit='UN',
+            unit_value_estimate=Decimal('5000'),
+        )
         Contract.objects.create(
             number='003/RELATORIO/2026', supplier=supplier, managing_organization=org,
             current_value=Decimal('12345.67'), initial_value=Decimal('12345.67'),
@@ -144,6 +189,21 @@ class ViewAndPermissionTests(TestCase):
         csv_response = self.client.get(reverse('export_contracts_csv'))
         self.assertEqual(csv_response.status_code, 200)
         self.assertIn('003/RELATORIO/2026', csv_response.content.decode('utf-8-sig'))
+
+        procurement_xlsx_response = self.client.get(reverse('export_procurements_xlsx'))
+        self.assertEqual(procurement_xlsx_response.status_code, 200)
+        self.assertTrue(procurement_xlsx_response.content.startswith(b'PK'))
+        procurement_parsed = read_xlsx_sheet(SimpleUploadedFile('pregoes.xlsx', procurement_xlsx_response.content), 'Pregoes')
+        self.assertEqual(procurement_parsed[0][0], 'Pregão')
+
+        procurement_pdf_response = self.client.get(reverse('export_procurements_pdf'))
+        self.assertEqual(procurement_pdf_response.status_code, 200)
+        self.assertTrue(procurement_pdf_response.content.startswith(b'%PDF'))
+
+        procurement_csv_response = self.client.get(reverse('export_procurements_csv'))
+        self.assertEqual(procurement_csv_response.status_code, 200)
+        self.assertIn('91000/2026', procurement_csv_response.content.decode('utf-8-sig'))
+
         template_response = self.client.get(reverse('import_template'))
         self.assertEqual(template_response.status_code, 200)
         template_rows = read_xlsx_sheet(SimpleUploadedFile('modelo.xlsx', template_response.content), 'Planilha1')
@@ -158,12 +218,24 @@ class ViewAndPermissionTests(TestCase):
             status=Contract.Status.ACTIVE, current_value=1000, initial_value=1000,
             end_date=timezone.localdate() + timedelta(days=200),
         )
+        procurement = Procurement.objects.create(number='90001/2026')
+        procurement_item = ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            specification='Item de teste',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value_estimate=Decimal('1'),
+        )
         urls = [
             reverse('contract_list'), reverse('contract_detail', args=[contract.pk]),
+            reverse('procurement_list'), reverse('procurement_detail', args=[procurement.pk]),
             reverse('supplier_list'), reverse('organization_list'), reverse('person_list'),
             reverse('commitment_list'), reverse('supplyorder_list'), reverse('delivery_list'),
             reverse('change_list'), reverse('process_list'), reverse('document_list'),
             reverse('audit_list'), reverse('help'), reverse('contract_create'),
+            reverse('procurement_create'), reverse('procurement_item_create') + f'?procurement={procurement.pk}',
+            reverse('procurement_item_update', args=[procurement_item.pk]),
             reverse('item_create') + f'?contract={contract.pk}',
             reverse('commitment_create') + f'?contract={contract.pk}',
             reverse('supplyorder_create') + f'?contract={contract.pk}',
@@ -175,3 +247,54 @@ class ViewAndPermissionTests(TestCase):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
+
+    def test_copy_procurement_items_view(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA COPIA')
+        org = Organization.objects.create(acronym='OM-COP', name='OM Copia')
+        procurement = Procurement.objects.create(number='90002/2026')
+        ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            specification='Item para copia',
+            quantity=Decimal('3'),
+            unit='UN',
+            unit_value_estimate=Decimal('10'),
+        )
+        contract = Contract.objects.create(
+            number='100/COPIA/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement,
+            initial_value=Decimal('30'),
+            current_value=Decimal('30'),
+        )
+        response = self.client.post(reverse('contract_copy_procurement_items', args=[contract.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(contract.items.count(), 1)
+
+    def test_procurement_item_form_rejects_planned_quantity_above_item_quantity(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        org = Organization.objects.create(acronym='OM-VLD', name='OM Validação')
+        procurement = Procurement.objects.create(number='92000/2026')
+
+        response = self.client.post(reverse('procurement_item_create'), {
+            'procurement': procurement.pk,
+            'item_number': '1',
+            'code': 'COD-1',
+            'nomenclature': 'Teste',
+            'specification': 'Especificação teste',
+            'quantity': '1',
+            'unit': 'UN',
+            'unit_value_estimate': '10',
+            'delivery_locations-TOTAL_FORMS': '1',
+            'delivery_locations-INITIAL_FORMS': '0',
+            'delivery_locations-MIN_NUM_FORMS': '0',
+            'delivery_locations-MAX_NUM_FORMS': '1000',
+            'delivery_locations-0-destination': org.pk,
+            'delivery_locations-0-quantity': '2',
+            'delivery_locations-0-notes': 'Acima do limite',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'A soma das quantidades por OM destino não pode ultrapassar a quantidade total do item.')

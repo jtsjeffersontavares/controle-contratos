@@ -16,6 +16,9 @@ from .models import (
     Delivery,
     Organization,
     Person,
+    Procurement,
+    ProcurementItem,
+    ProcurementItemDelivery,
     Supplier,
     SupplyOrder,
 )
@@ -346,6 +349,19 @@ def _person(text: str):
     return Person.objects.create(name=name, rank=rank)
 
 
+def _procurement(number: str, reference_org=None):
+    number = clean_text(number)
+    if not number:
+        return None
+    procurement = Procurement.objects.filter(number__iexact=number).first()
+    if procurement:
+        if reference_org and not procurement.requesting_organization_id:
+            procurement.requesting_organization = reference_org
+            procurement.save(update_fields=['requesting_organization', 'updated_at'])
+        return procurement
+    return Procurement.objects.create(number=number, requesting_organization=reference_org)
+
+
 def _item_key(row):
     return (row['ITEM_PREGAO'], row['COD_TDV'], row['TIPO'] or row['NOMENCLATURA'])
 
@@ -365,6 +381,7 @@ def import_preview(preview: dict, actor=None, filename='planilha.xlsx') -> dict:
         supplier = _supplier(first['EMPRESA'])
         managing_org = _org('SDAP')
         reference_org = _org(first['OM_TERMO_REFERENCIA'])
+        procurement = _procurement(first['PREGAO'], reference_org)
         manager = _person(first['GESTOR'])
         substitute = _person(first['SUPLENTE'])
         total_value = sum((Decimal(row['VALOR_TOTAL']) for row in contract_rows), Decimal('0'))
@@ -383,6 +400,7 @@ def import_preview(preview: dict, actor=None, filename='planilha.xlsx') -> dict:
                 'reference_organization': reference_org,
                 'manager': manager,
                 'substitute_manager': substitute,
+                'procurement': procurement,
                 'procurement_number': first['PREGAO'],
                 'process_number': first['PAG'],
                 'status': map_contract_status(first['STATUS'] or first['STATUS_VIGENCIA']),
@@ -400,15 +418,33 @@ def import_preview(preview: dict, actor=None, filename='planilha.xlsx') -> dict:
         for row in contract_rows:
             item_groups[_item_key(row)].append(row)
         item_objects = {}
+        procurement_item_objects = {}
         for key, item_rows in item_groups.items():
             sample = item_rows[0]
             quantity = sum((Decimal(row['QTD_EMPENHADO']) for row in item_rows), Decimal('0'))
+            procurement_item = None
+            if procurement:
+                procurement_item, procurement_item_created = ProcurementItem.objects.update_or_create(
+                    procurement=procurement,
+                    item_number=sample['ITEM_PREGAO'],
+                    code=sample['COD_TDV'],
+                    defaults={
+                        'nomenclature': sample['NOMENCLATURA'],
+                        'specification': sample['TIPO'] or sample['NOMENCLATURA'] or 'Item importado',
+                        'quantity': quantity,
+                        'unit': 'UN',
+                        'unit_value_estimate': Decimal(sample['VALOR_UNITARIO']),
+                    },
+                )
+                counters['procurement_items_created' if procurement_item_created else 'procurement_items_updated'] += 1
+            procurement_item_objects[key] = procurement_item
             item, created = ContractItem.objects.update_or_create(
                 contract=contract,
                 procurement_item=sample['ITEM_PREGAO'],
                 code=sample['COD_TDV'],
                 description=sample['TIPO'] or sample['NOMENCLATURA'] or 'Item importado',
                 defaults={
+                    'origin_procurement_item': procurement_item,
                     'nomenclature': sample['NOMENCLATURA'],
                     'quantity': quantity,
                     'unit': 'UN',
@@ -417,6 +453,20 @@ def import_preview(preview: dict, actor=None, filename='planilha.xlsx') -> dict:
             )
             item_objects[key] = item
             counters['items_created' if created else 'items_updated'] += 1
+
+        delivery_totals = defaultdict(Decimal)
+        for row in contract_rows:
+            if row['OM_DESTINO']:
+                delivery_totals[(_item_key(row), row['OM_DESTINO'])] += Decimal(row['QTD_EMPENHADO'])
+        for (item_key, om_text), total_qty in delivery_totals.items():
+            procurement_item = procurement_item_objects.get(item_key)
+            if not procurement_item:
+                continue
+            ProcurementItemDelivery.objects.update_or_create(
+                item=procurement_item,
+                destination=_org(om_text),
+                defaults={'quantity': total_qty},
+            )
 
         commitment_groups = defaultdict(list)
         for row in contract_rows:

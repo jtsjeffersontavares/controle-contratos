@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.forms.utils import ErrorList
 from django.db.models import Q, Sum
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponse
@@ -30,6 +31,9 @@ from .forms import (
     ImportWorkbookForm,
     OrganizationForm,
     PersonForm,
+    ProcurementForm,
+    ProcurementItemDeliveryFormSet,
+    ProcurementItemForm,
     SupplierForm,
     SupplyOrderForm,
 )
@@ -46,6 +50,8 @@ from .models import (
     ImportBatch,
     Organization,
     Person,
+    Procurement,
+    ProcurementItem,
     Supplier,
     SupplyOrder,
 )
@@ -155,7 +161,7 @@ class ContractDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return Contract.objects.select_related(
             'supplier', 'managing_organization', 'reference_organization', 'manager', 'substitute_manager',
-            'technical_inspector', 'substitute_inspector',
+            'technical_inspector', 'substitute_inspector', 'procurement',
         ).prefetch_related(
             'items', 'commitments__item', 'supply_orders__destination', 'supply_orders__deliveries',
             'changes', 'administrative_processes', 'documents',
@@ -201,6 +207,14 @@ class ContractCreateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin
     template_name = 'contracts/form.html'
     title = 'Novo contrato'
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if form.cleaned_data.get('copy_items_from_procurement'):
+            copied = self.object.copy_items_from_procurement()
+            if copied:
+                messages.success(self.request, f'{copied} item(ns) copiados do pregão vinculado.')
+        return response
+
 
 class ContractUpdateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin, UpdateView):
     model = Contract
@@ -216,6 +230,139 @@ class ContractDeleteView(LoginRequiredMixin, ManagerRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         messages.success(self.request, 'Contrato excluído.')
+        return super().form_valid(form)
+
+
+class ContractCopyProcurementItemsView(LoginRequiredMixin, EditorRequiredMixin, View):
+    def post(self, request, pk):
+        contract = get_object_or_404(Contract, pk=pk)
+        copied = contract.copy_items_from_procurement()
+        if copied:
+            messages.success(request, f'{copied} item(ns) copiados do pregão.')
+        else:
+            messages.info(request, 'Nenhum item novo para copiar (pregão não vinculado ou itens já copiados).')
+        return redirect(contract.get_absolute_url())
+
+
+class ProcurementListView(SearchableListView):
+    model = Procurement
+    template_name = 'contracts/procurement_list.html'
+    context_object_name = 'procurements'
+    search_fields = ['number', 'object', 'requesting_organization__acronym']
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('requesting_organization')
+
+
+class ProcurementDetailView(LoginRequiredMixin, DetailView):
+    model = Procurement
+    template_name = 'contracts/procurement_detail.html'
+    context_object_name = 'procurement'
+
+    def get_queryset(self):
+        return Procurement.objects.select_related('requesting_organization').prefetch_related(
+            'items__delivery_locations__destination', 'contracts__supplier',
+        )
+
+
+class ProcurementCreateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin, CreateView):
+    model = Procurement
+    form_class = ProcurementForm
+    template_name = 'contracts/form.html'
+    title = 'Novo pregão'
+    success_url = reverse_lazy('procurement_list')
+
+
+class ProcurementUpdateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin, UpdateView):
+    model = Procurement
+    form_class = ProcurementForm
+    template_name = 'contracts/form.html'
+    title = 'Editar pregão'
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+
+class ProcurementDeleteView(LoginRequiredMixin, ManagerRequiredMixin, DeleteView):
+    model = Procurement
+    template_name = 'contracts/confirm_delete.html'
+    success_url = reverse_lazy('procurement_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Pregão excluído.')
+        return super().form_valid(form)
+
+
+class ProcurementItemFormMixin(LoginRequiredMixin, EditorRequiredMixin, FormMetaMixin):
+    model = ProcurementItem
+    form_class = ProcurementItemForm
+    template_name = 'contracts/procurement_item_form.html'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        procurement_id = self.request.GET.get('procurement')
+        if procurement_id:
+            initial['procurement'] = procurement_id
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.method == 'POST':
+            context['delivery_formset'] = ProcurementItemDeliveryFormSet(self.request.POST, instance=self.object)
+        else:
+            context['delivery_formset'] = ProcurementItemDeliveryFormSet(instance=self.object)
+        context['item_quantity'] = getattr(self.object, 'quantity', None)
+        context['planned_quantity'] = getattr(self.object, 'delivered_locations_quantity', Decimal('0'))
+        return context
+
+    def form_valid(self, form):
+        self.object = form.save()
+        context = self.get_context_data(form=form)
+        formset = context['delivery_formset']
+        formset.instance = self.object
+        if formset.is_valid():
+            quantity = form.cleaned_data.get('quantity') or Decimal('0')
+            planned = sum(
+                (
+                    delivery_form.cleaned_data.get('quantity') or Decimal('0')
+                    for delivery_form in formset.forms
+                    if delivery_form.cleaned_data and not delivery_form.cleaned_data.get('DELETE')
+                ),
+                Decimal('0'),
+            )
+            if planned > quantity:
+                formset._non_form_errors = ErrorList([
+                    'A soma das quantidades por OM destino não pode ultrapassar a quantidade total do item.',
+                ])
+                context['planned_quantity'] = planned
+                context['item_quantity'] = quantity
+                return self.render_to_response(context)
+            formset.save()
+            messages.success(self.request, 'Item do pregão salvo com sucesso.')
+            return redirect(self.get_success_url())
+        return self.render_to_response(context)
+
+    def get_success_url(self):
+        return self.object.procurement.get_absolute_url()
+
+
+class ProcurementItemCreateView(ProcurementItemFormMixin, CreateView):
+    title = 'Novo item do pregão'
+
+
+class ProcurementItemUpdateView(ProcurementItemFormMixin, UpdateView):
+    title = 'Editar item do pregão'
+
+
+class ProcurementItemDeleteView(LoginRequiredMixin, EditorRequiredMixin, DeleteView):
+    model = ProcurementItem
+    template_name = 'contracts/confirm_delete.html'
+
+    def get_success_url(self):
+        return self.object.procurement.get_absolute_url()
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Item do pregão excluído.')
         return super().form_valid(form)
 
 
@@ -504,6 +651,26 @@ REPORT_HEADERS = [
 ]
 
 
+def _procurement_report_rows():
+    rows = []
+    for procurement in Procurement.objects.select_related('requesting_organization').prefetch_related('items'):
+        rows.append([
+            procurement.number,
+            procurement.object,
+            procurement.requesting_organization.acronym if procurement.requesting_organization else '',
+            procurement.get_status_display(),
+            procurement.opening_date,
+            procurement.items.count(),
+            procurement.estimated_value,
+        ])
+    return rows
+
+
+PROCUREMENT_REPORT_HEADERS = [
+    'Pregão', 'Objeto', 'OM requisitante', 'Situação', 'Abertura', 'Itens', 'Valor estimado',
+]
+
+
 class ExportContractsCsvView(LoginRequiredMixin, View):
     def get(self, request):
         response = HttpResponse(content_type='text/csv; charset=utf-8')
@@ -589,6 +756,78 @@ class ExportContractsPdfView(LoginRequiredMixin, View):
         response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="contratos_sdap.pdf"'
         AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Contratos', representation='Relatório PDF')
+        return response
+
+
+class ExportProcurementsCsvView(LoginRequiredMixin, View):
+    def get(self, request):
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="pregoes_sdap.csv"'
+        response.write('\ufeff')
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(PROCUREMENT_REPORT_HEADERS)
+        for row in _procurement_report_rows():
+            writer.writerow(row)
+        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Pregões', representation='Relatório CSV')
+        return response
+
+
+class ExportProcurementsXlsxView(LoginRequiredMixin, View):
+    def get(self, request):
+        content = write_simple_xlsx(PROCUREMENT_REPORT_HEADERS, _procurement_report_rows(), 'Pregoes')
+        response = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="pregoes_sdap.xlsx"'
+        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Pregões', representation='Relatório XLSX')
+        return response
+
+
+class ExportProcurementsPdfView(LoginRequiredMixin, View):
+    def get(self, request):
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.units import mm
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        except ImportError as exc:
+            raise RuntimeError('A dependência reportlab não está instalada.') from exc
+
+        buffer = io.BytesIO()
+        document = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=10 * mm,
+            leftMargin=10 * mm,
+            topMargin=10 * mm,
+            bottomMargin=10 * mm,
+        )
+        styles = getSampleStyleSheet()
+        elements = [Paragraph('Relatório de Pregões — SDAP', styles['Title']), Spacer(1, 5 * mm)]
+        data = [['Pregão', 'OM requisitante', 'Situação', 'Abertura', 'Itens', 'Valor estimado']]
+        for row in _procurement_report_rows():
+            data.append([
+                row[0],
+                row[2] or '—',
+                row[3],
+                row[4].strftime('%d/%m/%Y') if row[4] else '',
+                row[5],
+                ('R$ ' + f'{row[6]:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')),
+            ])
+        table = Table(data, repeatRows=1, colWidths=[40 * mm, 42 * mm, 35 * mm, 28 * mm, 20 * mm, 40 * mm])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#123B5D')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#CBD5E1')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
+        ]))
+        elements.append(table)
+        document.build(elements)
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="pregoes_sdap.pdf"'
+        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Pregões', representation='Relatório PDF')
         return response
 
 

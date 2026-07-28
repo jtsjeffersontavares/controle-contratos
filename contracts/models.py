@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q, Sum
@@ -93,6 +94,122 @@ class Supplier(TimeStampedModel):
         return f'{self.name} ({self.cnpj})' if self.cnpj else self.name
 
 
+class Procurement(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = 'RASCUNHO', 'Rascunho'
+        OPEN = 'EM_ANDAMENTO', 'Em andamento'
+        HOMOLOGATED = 'HOMOLOGADO', 'Homologado'
+        FAILED = 'FRACASSADO', 'Fracassado'
+        CANCELED = 'CANCELADO', 'Cancelado'
+
+    class Law(models.TextChoices):
+        LAW_8666 = '8666', 'Lei nº 8.666/1993'
+        LAW_14133 = '14133', 'Lei nº 14.133/2021'
+        OTHER = 'OUTRA', 'Outra'
+
+    number = models.CharField('número do pregão', max_length=100, unique=True)
+    object = models.TextField('objeto', blank=True)
+    requesting_organization = models.ForeignKey(
+        Organization,
+        verbose_name='OM do termo de referência',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='procurements',
+    )
+    law = models.CharField('legislação', max_length=10, choices=Law.choices, default=Law.LAW_14133)
+    opening_date = models.DateField('data de abertura/sessão', null=True, blank=True)
+    status = models.CharField('situação', max_length=20, choices=Status.choices, default=Status.DRAFT)
+    notes = models.TextField('observações', blank=True)
+    imported_from = models.CharField('origem da importação', max_length=180, blank=True)
+
+    class Meta:
+        ordering = [models.F('opening_date').desc(nulls_last=True), 'number']
+        verbose_name = 'Pregão'
+        verbose_name_plural = 'Pregões'
+
+    def __str__(self):
+        return self.number
+
+    def get_absolute_url(self):
+        return reverse('procurement_detail', args=[self.pk])
+
+    @property
+    def estimated_value(self):
+        return sum((item.total_value_estimate for item in self.items.all()), Decimal('0'))
+
+
+class ProcurementItem(TimeStampedModel):
+    procurement = models.ForeignKey(Procurement, verbose_name='pregão', on_delete=models.CASCADE, related_name='items')
+    item_number = models.CharField('item do pregão', max_length=40)
+    code = models.CharField('código/TDV', max_length=100, blank=True)
+    nomenclature = models.CharField('nomenclatura', max_length=180, blank=True)
+    specification = models.TextField('especificação')
+    quantity = models.DecimalField(
+        'quantidade licitada', max_digits=14, decimal_places=2, default=1,
+        validators=[MinValueValidator(Decimal('0'))],
+    )
+    unit = models.CharField('unidade', max_length=30, default='UN')
+    unit_value_estimate = models.DecimalField(
+        'valor unitário estimado', max_digits=18, decimal_places=2, default=0,
+        validators=[MinValueValidator(Decimal('0'))],
+    )
+
+    class Meta:
+        ordering = ['procurement', 'item_number']
+        constraints = [
+            models.UniqueConstraint(fields=['procurement', 'item_number', 'code'], name='unique_procurement_item_signature'),
+        ]
+        verbose_name = 'Item do pregão'
+        verbose_name_plural = 'Itens do pregão'
+
+    def __str__(self):
+        return f'{self.procurement.number} — Item {self.item_number} — {self.nomenclature or self.specification[:40]}'
+
+    def clean(self):
+        super().clean()
+        if not self.pk:
+            return
+        planned_total = self.delivery_locations.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+        if planned_total > self.quantity:
+            raise ValidationError({
+                'quantity': 'A quantidade do item não pode ser menor que a soma dos locais de entrega.'
+            })
+
+    @property
+    def total_value_estimate(self):
+        return self.quantity * self.unit_value_estimate
+
+    @property
+    def delivered_locations_quantity(self):
+        return self.delivery_locations.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+
+    @property
+    def contracted_quantity(self):
+        return self.contract_items.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+
+
+class ProcurementItemDelivery(TimeStampedModel):
+    item = models.ForeignKey(ProcurementItem, verbose_name='item do pregão', on_delete=models.CASCADE, related_name='delivery_locations')
+    destination = models.ForeignKey(Organization, verbose_name='OM destino', on_delete=models.PROTECT, related_name='procurement_deliveries')
+    quantity = models.DecimalField(
+        'quantidade', max_digits=14, decimal_places=2, default=1,
+        validators=[MinValueValidator(Decimal('0.01'))],
+    )
+    notes = models.CharField('observações', max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['item', 'destination']
+        constraints = [
+            models.UniqueConstraint(fields=['item', 'destination'], name='unique_procurement_item_destination'),
+        ]
+        verbose_name = 'Local de entrega do item'
+        verbose_name_plural = 'Locais de entrega do item'
+
+    def __str__(self):
+        return f'{self.item} — {self.destination.acronym} ({self.quantity})'
+
+
 class Contract(TimeStampedModel):
     class Status(models.TextChoices):
         DRAFT = 'RASCUNHO', 'Rascunho'
@@ -160,6 +277,14 @@ class Contract(TimeStampedModel):
         related_name='substitute_inspected_contracts',
     )
     procurement_number = models.CharField('pregão/contratação', max_length=120, blank=True)
+    procurement = models.ForeignKey(
+        Procurement,
+        verbose_name='pregão',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts',
+    )
     process_number = models.CharField('PAG/processo', max_length=120, blank=True)
     subprocess_number = models.CharField('subprocesso', max_length=100, blank=True)
     law = models.CharField('legislação', max_length=10, choices=Law.choices, default=Law.LAW_14133)
@@ -234,10 +359,42 @@ class Contract(TimeStampedModel):
         completed = sum((order.delivered_quantity for order in self.supply_orders.all()), Decimal('0'))
         return min(Decimal('100'), completed * Decimal('100') / total)
 
+    def copy_items_from_procurement(self) -> int:
+        if not self.procurement_id:
+            return 0
+        existing = set(
+            self.items.exclude(origin_procurement_item__isnull=True).values_list('origin_procurement_item_id', flat=True)
+        )
+        created_count = 0
+        for procurement_item in self.procurement.items.all():
+            if procurement_item.pk in existing:
+                continue
+            ContractItem.objects.create(
+                contract=self,
+                origin_procurement_item=procurement_item,
+                procurement_item=procurement_item.item_number,
+                code=procurement_item.code,
+                nomenclature=procurement_item.nomenclature,
+                description=procurement_item.specification,
+                quantity=procurement_item.quantity,
+                unit=procurement_item.unit,
+                unit_value=procurement_item.unit_value_estimate,
+            )
+            created_count += 1
+        return created_count
+
 
 class ContractItem(TimeStampedModel):
     contract = models.ForeignKey(Contract, verbose_name='contrato', on_delete=models.CASCADE, related_name='items')
     procurement_item = models.CharField('item do pregão', max_length=40, blank=True)
+    origin_procurement_item = models.ForeignKey(
+        ProcurementItem,
+        verbose_name='item do pregão de origem',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contract_items',
+    )
     code = models.CharField('código/TDV', max_length=100, blank=True)
     nomenclature = models.CharField('nomenclatura', max_length=180, blank=True)
     description = models.TextField('tipo/modelo/descrição')
