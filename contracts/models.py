@@ -485,6 +485,7 @@ class SupplyOrder(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name='supply_orders',
     )
+    procurement_destinations = models.TextField('OMs destino do pregão', blank=True)
     number = models.CharField('ordem de fornecimento', max_length=120, blank=True)
     official_reference = models.CharField('ofício/SIGAD de encaminhamento', max_length=160, blank=True)
     issue_date = models.DateField('assinatura/emissão da OF', null=True, blank=True)

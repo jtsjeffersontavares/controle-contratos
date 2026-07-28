@@ -375,7 +375,7 @@ class ContractOrderItemsView(LoginRequiredMixin, View):
                 )
             refs = ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations)
             title = item.nomenclature or item.description[:40]
-            label = f'{contract.number} — Item {item.procurement_item or "s/n"} — {title}'
+            label = f'Item {item.procurement_item or "s/n"} — {title}'
             items.append({
                 'id': item.pk,
                 'label': label,

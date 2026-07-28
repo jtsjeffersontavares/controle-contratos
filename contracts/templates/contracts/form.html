@@ -26,6 +26,7 @@
   const itemSelect = document.getElementById('id_item');
   const contractSelect = document.getElementById('id_contract');
   const destinationHelp = document.getElementById('id_destination_helptext');
+  const procurementDestinationsField = document.getElementById('id_procurement_destinations');
   const itemLocationsRaw = document.getElementById('item-locations-map');
   if (itemSelect && destinationHelp) {
     const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
@@ -36,6 +37,9 @@
       destinationHelp.textContent = refs
         ? `OMs de referência do item do pregão: ${refs}. Você pode selecionar outra OM destino.`
         : defaultText;
+      if (procurementDestinationsField) {
+        procurementDestinationsField.value = refs || '';
+      }
     };
 
     const orderItemsTemplateRaw = document.getElementById('order-items-url-template');

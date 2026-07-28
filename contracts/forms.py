@@ -181,11 +181,12 @@ class SupplyOrderForm(StyledModelForm):
     class Meta:
         model = SupplyOrder
         fields = [
-            'contract', 'item', 'commitment', 'destination', 'number', 'official_reference',
+            'contract', 'item', 'commitment', 'procurement_destinations', 'destination', 'official_reference',
             'issue_date', 'sent_date', 'deadline', 'quantity', 'value', 'status',
             'reported_delivery', 'reported_delivery_date_text', 'notes',
         ]
         widgets = {
+            'procurement_destinations': forms.Textarea(attrs={'rows': 2}),
             'issue_date': DATE_WIDGET,
             'sent_date': DATE_WIDGET,
             'deadline': DATE_WIDGET,
@@ -205,25 +206,35 @@ class SupplyOrderForm(StyledModelForm):
             self.add_error('commitment', 'O empenho selecionado não pertence ao contrato informado.')
         if issue_date and deadline and deadline < issue_date:
             self.add_error('deadline', 'O prazo não pode ser anterior à emissão da ordem.')
+
+        # Campo de referência do pregão é sempre derivado do item selecionado.
+        refs = self._build_procurement_destinations_text(item)
+        cleaned['procurement_destinations'] = refs
         return cleaned
+
+    @staticmethod
+    def _build_procurement_destinations_text(item):
+        if not item or not item.origin_procurement_item_id:
+            return ''
+        locations = list(
+            item.origin_procurement_item.delivery_locations.select_related('destination').values_list('destination__acronym', 'quantity')
+        )
+        return ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations) if locations else ''
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.item_locations_map = {}
+        self.fields['procurement_destinations'].disabled = True
+        self.fields['procurement_destinations'].help_text = 'Campo de referência fixo do item do pregão.'
         posted_contract = self.data.get(self.add_prefix('contract')) if self.is_bound else None
         contract = posted_contract or self.initial.get('contract') or getattr(self.instance, 'contract', None)
         contract_id = getattr(contract, 'id', contract)
         if contract_id:
             queryset = ContractItem.objects.filter(contract_id=contract_id).select_related('origin_procurement_item')
             self.fields['item'].queryset = queryset
+            self.fields['item'].label_from_instance = lambda item: f'Item {item.procurement_item or "s/n"} — {item.nomenclature or item.description[:40]}'
             for item in queryset:
-                locations = []
-                if item.origin_procurement_item_id:
-                    locations = list(
-                        item.origin_procurement_item.delivery_locations.select_related('destination').values_list('destination__acronym', 'quantity')
-                    )
-                refs = ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations) if locations else ''
-                self.item_locations_map[str(item.pk)] = refs
+                self.item_locations_map[str(item.pk)] = self._build_procurement_destinations_text(item)
 
         posted_item_id = None
         if self.is_bound:
@@ -235,12 +246,10 @@ class SupplyOrderForm(StyledModelForm):
             selected_item = ContractItem.objects.filter(pk=self.instance.item_id).select_related('origin_procurement_item').first()
 
         if selected_item and selected_item.origin_procurement_item_id:
-            locations = list(
-                selected_item.origin_procurement_item.delivery_locations.select_related('destination').values_list('destination__acronym', 'quantity')
-            )
-            if locations:
-                refs = ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations)
+            refs = self._build_procurement_destinations_text(selected_item)
+            if refs:
                 self.fields['destination'].help_text = f'OMs de referência do item do pregão: {refs}. Você pode selecionar outra OM destino.'
+            self.initial['procurement_destinations'] = refs
 
 
 class DeliveryForm(StyledModelForm):

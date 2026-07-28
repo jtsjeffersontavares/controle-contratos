@@ -586,6 +586,34 @@ class ViewAndPermissionTests(TestCase):
         self.assertContains(response, 'OMs de referência do item do pregão')
         self.assertContains(response, 'item-locations-map')
         self.assertContains(response, 'order-items-url-template')
+        self.assertContains(response, 'Item 1 — Item válido')
+        self.assertNotContains(response, '101/ORD/2026 — Item 1 — Item válido')
+        self.assertNotContains(response, 'id_number')
+        self.assertContains(response, 'OMs destino do pregão')
+        self.assertContains(response, 'name="procurement_destinations"')
+        self.assertContains(response, 'id="id_procurement_destinations"')
+        self.assertContains(response, 'disabled')
+
+        post_response = self.client.post(reverse('supplyorder_update', args=[order.pk]), {
+            'contract': contract.pk,
+            'item': valid_item.pk,
+            'commitment': '',
+            'procurement_destinations': 'OM MANUAL',
+            'destination': destination.pk,
+            'official_reference': 'SIGAD-123',
+            'issue_date': '',
+            'sent_date': '',
+            'deadline': '',
+            'quantity': '2',
+            'value': '200',
+            'status': SupplyOrder.Status.NOT_INFORMED,
+            'reported_delivery': '',
+            'reported_delivery_date_text': '',
+            'notes': '',
+        })
+        self.assertEqual(post_response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.procurement_destinations, 'OM-DST (2.00)')
 
     def test_contract_detail_shows_procurement_edit_rule_message(self):
         self.client.login(username='gestor', password='SenhaForte123!')
