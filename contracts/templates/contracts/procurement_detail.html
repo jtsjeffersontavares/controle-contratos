@@ -5,7 +5,6 @@
   <div>
     <div class="eyebrow">Pregão</div>
     <h1>{{ procurement.number }}</h1>
-    <p>{{ procurement.requesting_organization|default:'Sem OM requisitante' }}</p>
   </div>
   <div class="button-group">
     {% if can_manage %}<a class="button" href="{% url 'procurement_update' procurement.pk %}">Editar</a>{% endif %}
@@ -66,10 +65,18 @@
 <section class="panel">
   <div class="panel-heading"><h2>Contratos vinculados</h2></div>
   <ul class="record-list">
-    {% for contract in procurement.contracts.all %}
+    {% for row in linked_contracts %}
       <li>
-        <div><strong>{{ contract.number }}</strong><span>{{ contract.supplier.name }}</span></div>
-        <a href="{{ contract.get_absolute_url }}">Abrir</a>
+        <div>
+          <strong>{{ row.contract.number }}</strong>
+          <span>{{ row.contract.supplier.name }}</span>
+          {% if row.linked_item_numbers %}
+            <small>Itens do pregão vinculados: {{ row.linked_item_numbers|join:', ' }}</small>
+          {% else %}
+            <small>Sem itens do pregão vinculados neste contrato.</small>
+          {% endif %}
+        </div>
+        <a href="{{ row.contract.get_absolute_url }}">Abrir</a>
       </li>
     {% empty %}
       <li class="empty">Nenhum contrato vinculado a este pregão.</li>

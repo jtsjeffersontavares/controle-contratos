@@ -301,6 +301,56 @@ class ViewAndPermissionTests(TestCase):
         content = response.content.decode('utf-8')
         self.assertLess(content.find('>2<'), content.find('>10<'))
 
+    def test_procurement_detail_shows_linked_items_per_contract_and_hides_om_line(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA VINCULO PREGAO')
+        org = Organization.objects.create(acronym='DECEA', name='DECEA')
+        procurement = Procurement.objects.create(number='90146/CAE/2025', requesting_organization=org)
+        procurement_item_1 = ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            specification='Item 1',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value_estimate=Decimal('1'),
+        )
+        procurement_item_2 = ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='2',
+            specification='Item 2',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value_estimate=Decimal('1'),
+        )
+        contract = Contract.objects.create(
+            number='600/VINC/2026',
+            supplier=supplier,
+            procurement=procurement,
+            initial_value=Decimal('10'),
+            current_value=Decimal('10'),
+        )
+        contract.items.create(
+            procurement_item='1',
+            origin_procurement_item=procurement_item_1,
+            description='Item 1 no contrato',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value=Decimal('1'),
+        )
+        contract.items.create(
+            procurement_item='2',
+            origin_procurement_item=procurement_item_2,
+            description='Item 2 no contrato',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value=Decimal('1'),
+        )
+
+        response = self.client.get(reverse('procurement_detail', args=[procurement.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Itens do pregão vinculados: 1, 2')
+        self.assertNotContains(response, 'DECEA — DECEA')
+
     def test_contract_create_uses_procurement_object_and_hides_removed_fields(self):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA CONTRATO NOVO')

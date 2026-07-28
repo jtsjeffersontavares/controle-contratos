@@ -269,7 +269,7 @@ class ProcurementDetailView(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         return Procurement.objects.select_related('requesting_organization').prefetch_related(
-            'items__delivery_locations__destination', 'contracts__supplier',
+            'items__delivery_locations__destination', 'contracts__supplier', 'contracts__items__origin_procurement_item',
         )
 
     def get_context_data(self, **kwargs):
@@ -280,6 +280,25 @@ class ProcurementDetailView(LoginRequiredMixin, DetailView):
             return [int(part) if part.isdigit() else part.lower() for part in re.split(r'(\d+)', value or '')]
 
         context['procurement_items'] = sorted(items, key=lambda item: natural_key(item.item_number))
+
+        linked_contracts = []
+        for contract in self.object.contracts.all():
+            linked_numbers = []
+            seen = set()
+            for contract_item in contract.items.all():
+                origin = contract_item.origin_procurement_item
+                if not origin or origin.procurement_id != self.object.pk:
+                    continue
+                number = origin.item_number or contract_item.procurement_item or 's/n'
+                if number in seen:
+                    continue
+                seen.add(number)
+                linked_numbers.append(number)
+            linked_contracts.append({
+                'contract': contract,
+                'linked_item_numbers': sorted(linked_numbers, key=natural_key),
+            })
+        context['linked_contracts'] = linked_contracts
         return context
 
 
