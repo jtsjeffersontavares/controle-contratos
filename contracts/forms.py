@@ -33,13 +33,6 @@ class StyledModelForm(forms.ModelForm):
 
 
 class ContractForm(StyledModelForm):
-    copy_items_from_procurement = forms.BooleanField(
-        label='Copiar itens do pregão para o contrato',
-        required=False,
-        initial=True,
-        help_text='Cria os itens do contrato a partir dos itens cadastrados no pregão selecionado.',
-    )
-
     class Meta:
         model = Contract
         fields = [
@@ -47,7 +40,7 @@ class ContractForm(StyledModelForm):
             'manager', 'substitute_manager', 'technical_inspector', 'substitute_inspector',
             'procurement',
             'procurement_number', 'process_number', 'subprocess_number', 'law', 'status',
-            'signature_date', 'start_date', 'end_date', 'guarantee_end',
+            'signature_date', 'start_date', 'end_date',
             'initial_value', 'current_value', 'notes',
         ]
         widgets = {
@@ -66,6 +59,10 @@ class ContractForm(StyledModelForm):
         if start and end and end < start:
             self.add_error('end_date', 'O fim da vigência não pode ser anterior ao início.')
         return cleaned
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop('reference_organization', None)
 
 
 class OrganizationForm(StyledModelForm):
@@ -100,7 +97,7 @@ class ContractItemForm(StyledModelForm):
 class ProcurementForm(StyledModelForm):
     class Meta:
         model = Procurement
-        fields = ['number', 'object', 'requesting_organization', 'law', 'opening_date', 'status', 'notes']
+        fields = ['number', 'object', 'law', 'opening_date', 'status', 'notes']
         widgets = {
             'object': forms.Textarea(attrs={'rows': 4}),
             'notes': TEXTAREA_WIDGET,
@@ -171,6 +168,31 @@ class SupplyOrderForm(StyledModelForm):
         if issue_date and deadline and deadline < issue_date:
             self.add_error('deadline', 'O prazo não pode ser anterior à emissão da ordem.')
         return cleaned
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        contract = self.initial.get('contract') or getattr(self.instance, 'contract', None)
+        contract_id = getattr(contract, 'id', contract)
+        if contract_id:
+            queryset = ContractItem.objects.filter(contract_id=contract_id).select_related('origin_procurement_item')
+            self.fields['item'].queryset = queryset
+
+        posted_item_id = None
+        if self.is_bound:
+            posted_item_id = self.data.get(self.add_prefix('item'))
+        selected_item = None
+        if posted_item_id:
+            selected_item = ContractItem.objects.filter(pk=posted_item_id).select_related('origin_procurement_item').first()
+        elif self.instance.pk and self.instance.item_id:
+            selected_item = ContractItem.objects.filter(pk=self.instance.item_id).select_related('origin_procurement_item').first()
+
+        if selected_item and selected_item.origin_procurement_item_id:
+            locations = list(
+                selected_item.origin_procurement_item.delivery_locations.select_related('destination').values_list('destination__acronym', 'quantity')
+            )
+            if locations:
+                refs = ', '.join(f'{acronym} ({quantity})' for acronym, quantity in locations)
+                self.fields['destination'].help_text = f'OMs de referência do item do pregão: {refs}. Você pode selecionar outra OM destino.'
 
 
 class DeliveryForm(StyledModelForm):

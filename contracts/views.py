@@ -207,14 +207,6 @@ class ContractCreateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin
     template_name = 'contracts/form.html'
     title = 'Novo contrato'
 
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        if form.cleaned_data.get('copy_items_from_procurement'):
-            copied = self.object.copy_items_from_procurement()
-            if copied:
-                messages.success(self.request, f'{copied} item(ns) copiados do pregão vinculado.')
-        return response
-
 
 class ContractUpdateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin, UpdateView):
     model = Contract
@@ -231,17 +223,6 @@ class ContractDeleteView(LoginRequiredMixin, ManagerRequiredMixin, DeleteView):
     def form_valid(self, form):
         messages.success(self.request, 'Contrato excluído.')
         return super().form_valid(form)
-
-
-class ContractCopyProcurementItemsView(LoginRequiredMixin, EditorRequiredMixin, View):
-    def post(self, request, pk):
-        contract = get_object_or_404(Contract, pk=pk)
-        copied = contract.copy_items_from_procurement()
-        if copied:
-            messages.success(request, f'{copied} item(ns) copiados do pregão.')
-        else:
-            messages.info(request, 'Nenhum item novo para copiar (pregão não vinculado ou itens já copiados).')
-        return redirect(contract.get_absolute_url())
 
 
 class ProcurementListView(SearchableListView):

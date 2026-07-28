@@ -19,7 +19,6 @@ urlpatterns = [
     path('contratos/', views.ContractListView.as_view(), name='contract_list'),
     path('contratos/novo/', views.ContractCreateView.as_view(), name='contract_create'),
     path('contratos/<int:pk>/', views.ContractDetailView.as_view(), name='contract_detail'),
-    path('contratos/<int:pk>/copiar-itens-pregao/', views.ContractCopyProcurementItemsView.as_view(), name='contract_copy_procurement_items'),
     path('contratos/<int:pk>/editar/', views.ContractUpdateView.as_view(), name='contract_update'),
     path('contratos/<int:pk>/excluir/', views.ContractDeleteView.as_view(), name='contract_delete'),
 

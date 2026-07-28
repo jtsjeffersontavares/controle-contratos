@@ -248,30 +248,89 @@ class ViewAndPermissionTests(TestCase):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
 
-    def test_copy_procurement_items_view(self):
+    def test_contract_and_procurement_edit_forms_hide_removed_fields(self):
         self.client.login(username='gestor', password='SenhaForte123!')
-        supplier = Supplier.objects.create(name='EMPRESA COPIA')
-        org = Organization.objects.create(acronym='OM-COP', name='OM Copia')
-        procurement = Procurement.objects.create(number='90002/2026')
-        ProcurementItem.objects.create(
-            procurement=procurement,
-            item_number='1',
-            specification='Item para copia',
-            quantity=Decimal('3'),
-            unit='UN',
-            unit_value_estimate=Decimal('10'),
-        )
+        supplier = Supplier.objects.create(name='EMPRESA FORM')
+        org = Organization.objects.create(acronym='OM-FRM', name='OM Form')
+        procurement = Procurement.objects.create(number='90002/2026', requesting_organization=org)
         contract = Contract.objects.create(
-            number='100/COPIA/2026',
+            number='100/FORM/2026',
             supplier=supplier,
             managing_organization=org,
             procurement=procurement,
             initial_value=Decimal('30'),
             current_value=Decimal('30'),
         )
-        response = self.client.post(reverse('contract_copy_procurement_items', args=[contract.pk]))
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(contract.items.count(), 1)
+
+        contract_response = self.client.get(reverse('contract_update', args=[contract.pk]))
+        self.assertEqual(contract_response.status_code, 200)
+        self.assertNotContains(contract_response, 'Fim da garantia')
+        self.assertNotContains(contract_response, 'OM do termo de referência')
+
+        procurement_response = self.client.get(reverse('procurement_update', args=[procurement.pk]))
+        self.assertEqual(procurement_response.status_code, 200)
+        self.assertNotContains(procurement_response, 'OM do termo de referência')
+
+    def test_supply_order_edit_filters_items_by_contract_and_shows_procurement_locations(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA ORD')
+        org = Organization.objects.create(acronym='OM-ORD', name='OM Ordens')
+        destination = Organization.objects.create(acronym='OM-DST', name='OM Destino')
+        procurement = Procurement.objects.create(number='90003/2026')
+        procurement_item = ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='1',
+            specification='Item de pregão para OF',
+            quantity=Decimal('5'),
+            unit='UN',
+            unit_value_estimate=Decimal('100'),
+        )
+        ProcurementItemDelivery.objects.create(item=procurement_item, destination=destination, quantity=Decimal('2'))
+
+        contract = Contract.objects.create(
+            number='101/ORD/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement,
+            initial_value=Decimal('500'),
+            current_value=Decimal('500'),
+        )
+        valid_item = contract.items.create(
+            procurement_item='1',
+            origin_procurement_item=procurement_item,
+            description='Item válido',
+            quantity=Decimal('5'),
+            unit='UN',
+            unit_value=Decimal('100'),
+        )
+        other_contract = Contract.objects.create(
+            number='102/ORD/2026',
+            supplier=supplier,
+            managing_organization=org,
+            initial_value=Decimal('100'),
+            current_value=Decimal('100'),
+        )
+        invalid_item = other_contract.items.create(
+            procurement_item='99',
+            description='Item de outro contrato',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value=Decimal('100'),
+        )
+
+        order = SupplyOrder.objects.create(
+            contract=contract,
+            item=valid_item,
+            destination=destination,
+            quantity=Decimal('2'),
+            value=Decimal('200'),
+        )
+
+        response = self.client.get(reverse('supplyorder_update', args=[order.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, str(valid_item.pk))
+        self.assertNotContains(response, 'Item de outro contrato')
+        self.assertContains(response, 'OMs de referência do item do pregão')
 
     def test_procurement_item_form_rejects_planned_quantity_above_item_quantity(self):
         self.client.login(username='gestor', password='SenhaForte123!')

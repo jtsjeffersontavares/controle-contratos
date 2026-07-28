@@ -8,6 +8,11 @@
 - Adicionadas validações de consistência para evitar soma de destinos maior que a quantidade do item.
 - Adicionadas exportações de pregões em CSV, XLSX e PDF.
 - Ampliada a suíte de testes cobrindo importação, cópia de itens, páginas e relatórios de pregões.
+- Removido o campo "OM do termo de referência" da edição de pregões.
+- Removido o botão de copiar itens do pregão no contrato.
+- Removidos da edição de contrato os campos "Fim da garantia" e "OM do termo de referência".
+- Ajustada edição de ordem para listar somente itens do próprio contrato e exibir OMs de referência do item do pregão.
+- Removido o atalho "Ordens de fornecimento" do menu lateral.
 
 ## Pendências priorizadas
 
