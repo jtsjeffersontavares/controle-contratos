@@ -28,15 +28,17 @@
   const destinationHelp = document.getElementById('id_destination_helptext');
   const procurementDestinationsField = document.getElementById('id_procurement_destinations');
   const itemLocationsRaw = document.getElementById('item-locations-map');
-  if (itemSelect && destinationHelp) {
+  if (itemSelect) {
     const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
-    const defaultText = destinationHelp.textContent || '';
+    const defaultText = destinationHelp ? (destinationHelp.textContent || '') : '';
     const refreshDestinationHelp = () => {
       const selected = itemSelect.value;
       const refs = itemLocationsMap[selected] || '';
-      destinationHelp.textContent = refs
-        ? `OMs de referência do item do pregão: ${refs}. Você pode selecionar outra OM destino.`
-        : defaultText;
+      if (destinationHelp) {
+        destinationHelp.textContent = refs
+          ? `OMs de referência do item do pregão: ${refs}. Você pode selecionar outra OM destino.`
+          : defaultText;
+      }
       if (procurementDestinationsField) {
         procurementDestinationsField.value = refs || '';
       }
