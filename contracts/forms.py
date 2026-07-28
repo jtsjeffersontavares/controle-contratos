@@ -57,11 +57,22 @@ class ContractForm(StyledModelForm):
         end = cleaned.get('end_date')
         if start and end and end < start:
             self.add_error('end_date', 'O fim da vigência não pode ser anterior ao início.')
+
+        if self.instance.pk:
+            has_items = self.instance.items.exists()
+            new_procurement = cleaned.get('procurement')
+            if has_items and new_procurement != self.instance.procurement:
+                self.add_error('procurement', 'Não é permitido alterar o pregão após inclusão de itens no contrato.')
         return cleaned
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields.pop('reference_organization', None)
+        if self.instance.pk and self.instance.items.exists():
+            self.fields['procurement'].disabled = True
+            self.fields['procurement'].help_text = 'Pregão bloqueado: já existem itens vinculados ao contrato.'
+        else:
+            self.fields['procurement'].help_text = 'Pode ser alterado enquanto o contrato não possuir itens.'
 
 
 class OrganizationForm(StyledModelForm):

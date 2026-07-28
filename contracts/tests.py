@@ -315,6 +315,99 @@ class ViewAndPermissionTests(TestCase):
         self.assertIn('Item A', contract.object)
         self.assertEqual(contract.procurement, procurement)
 
+    def test_contract_update_allows_procurement_change_when_no_items(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA TROCA PREGAO')
+        org = Organization.objects.create(acronym='OM-TRC', name='OM Troca')
+        procurement_a = Procurement.objects.create(number='97000/2026')
+        procurement_b = Procurement.objects.create(number='98000/2026')
+        contract = Contract.objects.create(
+            number='401/TROCA/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement_a,
+            initial_value=Decimal('100'),
+            current_value=Decimal('100'),
+        )
+
+        response = self.client.post(reverse('contract_update', args=[contract.pk]), {
+            'number': contract.number,
+            'object': contract.object,
+            'supplier': supplier.pk,
+            'procurement': procurement_b.pk,
+            'process_number': contract.process_number,
+            'subprocess_number': contract.subprocess_number,
+            'law': contract.law,
+            'status': contract.status,
+            'manager': '',
+            'substitute_manager': '',
+            'technical_inspector': '',
+            'substitute_inspector': '',
+            'signature_date': '',
+            'start_date': '',
+            'end_date': '',
+            'initial_value': '100',
+            'current_value': '100',
+            'notes': '',
+            'procurement_number': '',
+            'managing_organization': org.pk,
+        })
+        self.assertEqual(response.status_code, 302)
+        contract.refresh_from_db()
+        self.assertEqual(contract.procurement, procurement_b)
+
+    def test_contract_update_blocks_procurement_change_when_has_items(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA BLOQUEIO PREGAO')
+        org = Organization.objects.create(acronym='OM-BLC', name='OM Bloqueio')
+        procurement_a = Procurement.objects.create(number='99000/2026')
+        procurement_b = Procurement.objects.create(number='99100/2026')
+        contract = Contract.objects.create(
+            number='402/BLOQ/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement_a,
+            initial_value=Decimal('100'),
+            current_value=Decimal('100'),
+        )
+        contract.items.create(
+            procurement_item='1',
+            description='Item já vinculado',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value=Decimal('100'),
+        )
+
+        get_response = self.client.get(reverse('contract_update', args=[contract.pk]))
+        self.assertEqual(get_response.status_code, 200)
+        self.assertContains(get_response, 'Pregão bloqueado: já existem itens vinculados ao contrato.')
+
+        response = self.client.post(reverse('contract_update', args=[contract.pk]), {
+            'number': contract.number,
+            'object': contract.object,
+            'supplier': supplier.pk,
+            'procurement': procurement_b.pk,
+            'process_number': contract.process_number,
+            'subprocess_number': contract.subprocess_number,
+            'law': contract.law,
+            'status': contract.status,
+            'manager': '',
+            'substitute_manager': '',
+            'technical_inspector': '',
+            'substitute_inspector': '',
+            'signature_date': '',
+            'start_date': '',
+            'end_date': '',
+            'initial_value': '100',
+            'current_value': '100',
+            'notes': '',
+            'procurement_number': '',
+            'managing_organization': org.pk,
+        })
+        self.assertEqual(response.status_code, 302)
+        contract.refresh_from_db()
+        self.assertEqual(contract.procurement, procurement_a)
+
     def test_contract_item_create_shows_only_procurement_items_of_contract(self):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA ITEM CONTRATUAL')
@@ -413,6 +506,35 @@ class ViewAndPermissionTests(TestCase):
         self.assertContains(response, 'OMs de referência do item do pregão')
         self.assertContains(response, 'item-locations-map')
         self.assertContains(response, 'order-items-url-template')
+
+    def test_contract_detail_shows_procurement_edit_rule_message(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA AVISO PREGAO')
+        org = Organization.objects.create(acronym='OM-AVS', name='OM Aviso')
+        procurement = Procurement.objects.create(number='99200/2026')
+        contract = Contract.objects.create(
+            number='500/AVISO/2026',
+            supplier=supplier,
+            managing_organization=org,
+            procurement=procurement,
+            initial_value=Decimal('100'),
+            current_value=Decimal('100'),
+        )
+
+        response_without_items = self.client.get(reverse('contract_detail', args=[contract.pk]))
+        self.assertEqual(response_without_items.status_code, 200)
+        self.assertContains(response_without_items, 'Pregão pode ser alterado até o primeiro item contratual ser cadastrado.')
+
+        contract.items.create(
+            procurement_item='1',
+            description='Item para bloquear pregão',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value=Decimal('100'),
+        )
+        response_with_items = self.client.get(reverse('contract_detail', args=[contract.pk]))
+        self.assertEqual(response_with_items.status_code, 200)
+        self.assertContains(response_with_items, 'Pregão bloqueado para edição: já existe item contratual cadastrado.')
 
     def test_contract_order_items_endpoint_returns_only_contract_items(self):
         self.client.login(username='gestor', password='SenhaForte123!')

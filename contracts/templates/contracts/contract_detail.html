@@ -11,7 +11,7 @@
 </div>
 <section class="panel"><div class="panel-heading"><h2>Dados principais</h2></div><dl class="detail-grid">
   <div><dt>Objeto</dt><dd>{{ contract.object|default:'Não informado' }}</dd></div><div><dt>PAG/Processo</dt><dd>{{ contract.process_number|default:'—' }}</dd></div>
-  <div><dt>Pregão</dt><dd>{% if contract.procurement %}<a href="{{ contract.procurement.get_absolute_url }}">{{ contract.procurement.number }}</a>{% else %}{{ contract.procurement_number|default:'—' }}{% endif %}</dd></div><div><dt>Subprocesso</dt><dd>{{ contract.subprocess_number|default:'—' }}</dd></div>
+  <div><dt>Pregão</dt><dd>{% if contract.procurement %}<a href="{{ contract.procurement.get_absolute_url }}">{{ contract.procurement.number }}</a>{% else %}{{ contract.procurement_number|default:'—' }}{% endif %}<small>{% if contract.items.all %}Pregão bloqueado para edição: já existe item contratual cadastrado.{% else %}Pregão pode ser alterado até o primeiro item contratual ser cadastrado.{% endif %}</small></dd></div><div><dt>Subprocesso</dt><dd>{{ contract.subprocess_number|default:'—' }}</dd></div>
   <div><dt>OM gestora</dt><dd>{{ contract.managing_organization|default:'—' }}</dd></div><div><dt>OM do termo de referência</dt><dd>{{ contract.reference_organization|default:'—' }}</dd></div>
   <div><dt>Gestor</dt><dd>{{ contract.manager|default:'—' }}</dd></div><div><dt>Suplente</dt><dd>{{ contract.substitute_manager|default:'—' }}</dd></div>
   <div><dt>Assinatura</dt><dd>{{ contract.signature_date|date:'d/m/Y'|default:'—' }}</dd></div><div><dt>Garantia</dt><dd>{{ contract.guarantee_end|date:'d/m/Y'|default:'—' }}</dd></div>
