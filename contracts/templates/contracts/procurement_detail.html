@@ -33,7 +33,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for item in procurement.items.all %}
+        {% for item in procurement_items %}
           <tr>
             <td>{{ item.item_number }}</td>
             <td>{{ item.code|default:'—' }}</td>

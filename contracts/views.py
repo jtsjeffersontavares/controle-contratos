@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import mimetypes
+import re
 from pathlib import Path
 from datetime import timedelta
 from collections import Counter
@@ -270,6 +271,16 @@ class ProcurementDetailView(LoginRequiredMixin, DetailView):
         return Procurement.objects.select_related('requesting_organization').prefetch_related(
             'items__delivery_locations__destination', 'contracts__supplier',
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        items = list(self.object.items.all())
+
+        def natural_key(value: str):
+            return [int(part) if part.isdigit() else part.lower() for part in re.split(r'(\d+)', value or '')]
+
+        context['procurement_items'] = sorted(items, key=lambda item: natural_key(item.item_number))
+        return context
 
 
 class ProcurementCreateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin, CreateView):

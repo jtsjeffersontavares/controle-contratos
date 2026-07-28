@@ -270,6 +270,36 @@ class ViewAndPermissionTests(TestCase):
         procurement_response = self.client.get(reverse('procurement_update', args=[procurement.pk]))
         self.assertEqual(procurement_response.status_code, 200)
         self.assertNotContains(procurement_response, 'OM do termo de referência')
+        self.assertNotContains(procurement_response, 'Objeto')
+
+        procurement_list_response = self.client.get(reverse('procurement_list'))
+        self.assertEqual(procurement_list_response.status_code, 200)
+        self.assertNotContains(procurement_list_response, 'OM requisitante')
+
+    def test_procurement_detail_orders_items_by_item_number(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        procurement = Procurement.objects.create(number='99300/2026')
+        ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='10',
+            specification='Item dez',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value_estimate=Decimal('1'),
+        )
+        ProcurementItem.objects.create(
+            procurement=procurement,
+            item_number='2',
+            specification='Item dois',
+            quantity=Decimal('1'),
+            unit='UN',
+            unit_value_estimate=Decimal('1'),
+        )
+
+        response = self.client.get(reverse('procurement_detail', args=[procurement.pk]))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertLess(content.find('>2<'), content.find('>10<'))
 
     def test_contract_create_uses_procurement_object_and_hides_removed_fields(self):
         self.client.login(username='gestor', password='SenhaForte123!')

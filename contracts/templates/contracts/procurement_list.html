@@ -25,8 +25,6 @@
     <thead>
       <tr>
         <th>Pregão</th>
-        <th>Objeto</th>
-        <th>OM requisitante</th>
         <th>Situação</th>
         <th>Abertura</th>
         <th></th>
@@ -36,8 +34,6 @@
       {% for procurement in procurements %}
         <tr>
           <td><a href="{{ procurement.get_absolute_url }}"><strong>{{ procurement.number }}</strong></a></td>
-          <td>{{ procurement.object|default:'—'|truncatechars:60 }}</td>
-          <td>{{ procurement.requesting_organization.acronym|default:'—' }}</td>
           <td><span class="badge">{{ procurement.get_status_display }}</span></td>
           <td>{{ procurement.opening_date|date:'d/m/Y'|default:'—' }}</td>
           <td class="actions">
@@ -46,7 +42,7 @@
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="6" class="empty">Nenhum pregão cadastrado.</td></tr>
+        <tr><td colspan="4" class="empty">Nenhum pregão cadastrado.</td></tr>
       {% endfor %}
     </tbody>
   </table>

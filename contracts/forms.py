@@ -137,9 +137,8 @@ class ContractItemForm(StyledModelForm):
 class ProcurementForm(StyledModelForm):
     class Meta:
         model = Procurement
-        fields = ['number', 'object', 'law', 'opening_date', 'status', 'notes']
+        fields = ['number', 'law', 'opening_date', 'status', 'notes']
         widgets = {
-            'object': forms.Textarea(attrs={'rows': 4}),
             'notes': TEXTAREA_WIDGET,
             'opening_date': DATE_WIDGET,
         }
