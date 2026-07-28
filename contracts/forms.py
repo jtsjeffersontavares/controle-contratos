@@ -36,15 +36,14 @@ class ContractForm(StyledModelForm):
     class Meta:
         model = Contract
         fields = [
-            'number', 'object', 'supplier', 'managing_organization', 'reference_organization',
+            'number', 'supplier', 'reference_organization',
             'manager', 'substitute_manager', 'technical_inspector', 'substitute_inspector',
             'procurement',
-            'procurement_number', 'process_number', 'subprocess_number', 'law', 'status',
+            'process_number', 'subprocess_number', 'law', 'status',
             'signature_date', 'start_date', 'end_date',
             'initial_value', 'current_value', 'notes',
         ]
         widgets = {
-            'object': forms.Textarea(attrs={'rows': 4}),
             'notes': TEXTAREA_WIDGET,
             'signature_date': DATE_WIDGET,
             'start_date': DATE_WIDGET,

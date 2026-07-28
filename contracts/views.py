@@ -138,7 +138,7 @@ class ContractListView(SearchableListView):
     model = Contract
     template_name = 'contracts/contract_list.html'
     context_object_name = 'contracts'
-    search_fields = ['number', 'supplier__name', 'object', 'process_number', 'procurement_number']
+    search_fields = ['number', 'supplier__name', 'process_number']
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related('supplier', 'manager', 'reference_organization')
