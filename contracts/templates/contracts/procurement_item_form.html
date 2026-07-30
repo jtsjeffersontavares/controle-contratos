@@ -24,30 +24,48 @@
   <h2>Locais de entrega</h2>
   <p class="hint">A soma das quantidades por OM não pode ser maior que a quantidade total do item.</p>
   <p class="hint">Quantidade do item: <strong>{{ item_quantity|default:'—' }}</strong> | Quantidade planejada atual: <strong>{{ planned_quantity|default:'0' }}</strong></p>
-  {{ delivery_formset.management_form }}
-  {% if delivery_formset.non_form_errors %}<div class="message error">{{ delivery_formset.non_form_errors }}</div>{% endif %}
-  <div class="table-wrap">
+  <div class="table-wrap" data-delivery-formset>
+    {{ delivery_formset.management_form }}
+    {% if delivery_formset.non_form_errors %}<div class="message error">{{ delivery_formset.non_form_errors }}</div>{% endif %}
     <table>
       <thead>
         <tr>
           <th>OM destino</th>
           <th>Quantidade</th>
           <th>Observações</th>
-          <th>Excluir</th>
+          <th>Ação</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody data-delivery-formset-body>
         {% for delivery_form in delivery_formset %}
-          <tr>
+          <tr data-delivery-form-row>
             {{ delivery_form.id }}
             <td>{{ delivery_form.destination }}{{ delivery_form.destination.errors }}</td>
             <td>{{ delivery_form.quantity }}{{ delivery_form.quantity.errors }}</td>
-            <td>{{ delivery_form.notes }}</td>
-            <td>{% if delivery_form.instance.pk %}{{ delivery_form.DELETE }}{% endif %}</td>
+            <td>{{ delivery_form.notes }}{{ delivery_form.notes.errors }}</td>
+            <td>
+              <span hidden>{{ delivery_form.DELETE }}</span>
+              <button type="button" class="button danger-link" data-delivery-form-remove>Excluir</button>
+            </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+    <div class="form-actions" style="justify-content:flex-start;margin-top:1rem;">
+      <button type="button" class="button" data-delivery-form-add>Adicionar OM destino</button>
+    </div>
+    <template data-delivery-form-template>
+      <tr data-delivery-form-row>
+        {{ delivery_formset.empty_form.id }}
+        <td>{{ delivery_formset.empty_form.destination }}</td>
+        <td>{{ delivery_formset.empty_form.quantity }}</td>
+        <td>{{ delivery_formset.empty_form.notes }}</td>
+        <td>
+          <span hidden>{{ delivery_formset.empty_form.DELETE }}</span>
+          <button type="button" class="button danger-link" data-delivery-form-remove>Excluir</button>
+        </td>
+      </tr>
+    </template>
   </div>
 
   <div class="form-actions">

@@ -173,7 +173,7 @@ ProcurementItemDeliveryFormSet = forms.inlineformset_factory(
     ProcurementItem,
     ProcurementItemDelivery,
     fields=['destination', 'quantity', 'notes'],
-    extra=3,
+    extra=1,
     can_delete=True,
 )
 

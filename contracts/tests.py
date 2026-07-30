@@ -726,3 +726,39 @@ class ViewAndPermissionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'A soma das quantidades por OM destino não pode ultrapassar a quantidade total do item.')
+
+    def test_procurement_item_form_allows_adding_and_removing_delivery_locations(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        org_a = Organization.objects.create(acronym='OM-A', name='OM A')
+        org_b = Organization.objects.create(acronym='OM-B', name='OM B')
+        procurement = Procurement.objects.create(number='92100/2026')
+
+        response = self.client.post(reverse('procurement_item_create'), {
+            'procurement': procurement.pk,
+            'item_number': '1',
+            'code': 'COD-1',
+            'nomenclature': 'Teste',
+            'model': 'Modelo',
+            'brand': 'Marca',
+            'quantity': '5',
+            'unit': 'UN',
+            'unit_value': '10',
+            'delivery_locations-TOTAL_FORMS': '2',
+            'delivery_locations-INITIAL_FORMS': '0',
+            'delivery_locations-MIN_NUM_FORMS': '0',
+            'delivery_locations-MAX_NUM_FORMS': '1000',
+            'delivery_locations-0-destination': org_a.pk,
+            'delivery_locations-0-quantity': '2',
+            'delivery_locations-0-notes': 'Mantida',
+            'delivery_locations-1-destination': org_b.pk,
+            'delivery_locations-1-quantity': '3',
+            'delivery_locations-1-notes': 'Removida',
+            'delivery_locations-1-DELETE': 'on',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        item = ProcurementItem.objects.get(procurement=procurement)
+        deliveries = list(item.delivery_locations.order_by('destination__acronym'))
+        self.assertEqual(len(deliveries), 1)
+        self.assertEqual(deliveries[0].destination, org_a)
+        self.assertEqual(deliveries[0].quantity, Decimal('2'))
