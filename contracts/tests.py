@@ -369,6 +369,7 @@ class ViewAndPermissionTests(TestCase):
         self.assertEqual(create_response.status_code, 200)
         self.assertNotContains(create_response, 'OM gestora')
         self.assertNotContains(create_response, 'Pregão/contratação')
+        self.assertContains(create_response, 'data-currency="brl"')
 
         post_response = self.client.post(reverse('contract_create'), {
             'number': '200/NOVO/2026',

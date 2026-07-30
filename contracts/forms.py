@@ -22,6 +22,13 @@ TEXTAREA_WIDGET = forms.Textarea(attrs={'rows': 3})
 
 
 class StyledModelForm(forms.ModelForm):
+    @staticmethod
+    def _is_currency_field(name, field):
+        if not isinstance(field, forms.DecimalField):
+            return False
+        label = str(getattr(field, 'label', '') or '').lower()
+        return 'valor' in label or 'value' in name.lower()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
@@ -30,6 +37,18 @@ class StyledModelForm(forms.ModelForm):
                 field.widget.attrs['class'] = f'{current} checkbox-input'.strip()
             else:
                 field.widget.attrs['class'] = f'{current} form-control'.strip()
+
+        for name, field in self.fields.items():
+            if not self._is_currency_field(name, field):
+                continue
+            attrs = dict(field.widget.attrs)
+            attrs['data-currency'] = 'brl'
+            attrs['inputmode'] = 'decimal'
+            attrs.setdefault('placeholder', 'R$ 0,00')
+            if isinstance(field.widget, forms.NumberInput):
+                field.widget = forms.TextInput(attrs=attrs)
+            else:
+                field.widget.attrs.update(attrs)
 
 
 class ContractForm(StyledModelForm):
