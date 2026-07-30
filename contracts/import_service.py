@@ -430,10 +430,11 @@ def import_preview(preview: dict, actor=None, filename='planilha.xlsx') -> dict:
                     code=sample['COD_TDV'],
                     defaults={
                         'nomenclature': sample['NOMENCLATURA'],
-                        'specification': sample['TIPO'] or sample['NOMENCLATURA'] or 'Item importado',
+                        'model': sample['TIPO'] or sample['NOMENCLATURA'] or 'Item importado',
+                        'brand': '',
                         'quantity': quantity,
                         'unit': 'UN',
-                        'unit_value_estimate': Decimal(sample['VALOR_UNITARIO']),
+                        'unit_value': Decimal(sample['VALOR_UNITARIO']),
                     },
                 )
                 counters['procurement_items_created' if procurement_item_created else 'procurement_items_updated'] += 1

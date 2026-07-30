@@ -165,8 +165,8 @@ class ProcurementForm(StyledModelForm):
 class ProcurementItemForm(StyledModelForm):
     class Meta:
         model = ProcurementItem
-        fields = ['procurement', 'item_number', 'code', 'nomenclature', 'specification', 'quantity', 'unit', 'unit_value_estimate']
-        widgets = {'specification': TEXTAREA_WIDGET}
+        fields = ['procurement', 'item_number', 'code', 'nomenclature', 'model', 'brand', 'quantity', 'unit', 'unit_value']
+        widgets = {'model': TEXTAREA_WIDGET, 'brand': TEXTAREA_WIDGET}
 
 
 ProcurementItemDeliveryFormSet = forms.inlineformset_factory(

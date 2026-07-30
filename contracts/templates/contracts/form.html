@@ -214,12 +214,8 @@
         const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         if (!response.ok) throw new Error('Falha ao carregar pregão');
         const data = await response.json();
-        if (objectInput) {
-          if (data.items?.length) {
-            objectInput.value = data.items.slice(0, 8).map((item) => item.title).join('; ');
-          } else if (data.object) {
-            objectInput.value = data.object;
-          }
+        if (objectInput && data.items?.length) {
+          objectInput.value = data.items.slice(0, 8).map((item) => item.title).join('; ');
         }
         renderItems(data.items || []);
       } catch (_error) {

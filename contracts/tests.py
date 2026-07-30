@@ -89,10 +89,11 @@ class ContractModelTests(TestCase):
             item_number='1',
             code='P-1/01A-DTS',
             nomenclature='VEICULO',
-            specification='MODELO TESTE',
+            model='MODELO TESTE',
+            brand='MARCA TESTE',
             quantity=Decimal('2'),
             unit='UN',
-            unit_value_estimate=Decimal('100000'),
+            unit_value=Decimal('100000'),
         )
         contract = Contract.objects.create(
             number='010/COPIA/2026',
@@ -168,10 +169,10 @@ class ViewAndPermissionTests(TestCase):
         ProcurementItem.objects.create(
             procurement=procurement,
             item_number='1',
-            specification='Item relatório',
+            model='Item relatório',
             quantity=Decimal('2'),
             unit='UN',
-            unit_value_estimate=Decimal('5000'),
+            unit_value=Decimal('5000'),
         )
         Contract.objects.create(
             number='003/RELATORIO/2026', supplier=supplier, managing_organization=org,
@@ -222,10 +223,10 @@ class ViewAndPermissionTests(TestCase):
         procurement_item = ProcurementItem.objects.create(
             procurement=procurement,
             item_number='1',
-            specification='Item de teste',
+            model='Item de teste',
             quantity=Decimal('1'),
             unit='UN',
-            unit_value_estimate=Decimal('1'),
+            unit_value=Decimal('1'),
         )
         urls = [
             reverse('contract_list'), reverse('contract_detail', args=[contract.pk]),
@@ -282,18 +283,18 @@ class ViewAndPermissionTests(TestCase):
         ProcurementItem.objects.create(
             procurement=procurement,
             item_number='10',
-            specification='Item dez',
+            model='Item dez',
             quantity=Decimal('1'),
             unit='UN',
-            unit_value_estimate=Decimal('1'),
+            unit_value=Decimal('1'),
         )
         ProcurementItem.objects.create(
             procurement=procurement,
             item_number='2',
-            specification='Item dois',
+            model='Item de teste',
             quantity=Decimal('1'),
             unit='UN',
-            unit_value_estimate=Decimal('1'),
+            unit_value=Decimal('1'),
         )
 
         response = self.client.get(reverse('procurement_detail', args=[procurement.pk]))
@@ -309,18 +310,18 @@ class ViewAndPermissionTests(TestCase):
         procurement_item_1 = ProcurementItem.objects.create(
             procurement=procurement,
             item_number='1',
-            specification='Item 1',
+            model='Item 1',
             quantity=Decimal('1'),
             unit='UN',
-            unit_value_estimate=Decimal('1'),
+            unit_value=Decimal('1'),
         )
         procurement_item_2 = ProcurementItem.objects.create(
             procurement=procurement,
             item_number='2',
-            specification='Item 2',
+            model='Item 2',
             quantity=Decimal('1'),
             unit='UN',
-            unit_value_estimate=Decimal('1'),
+            unit_value=Decimal('1'),
         )
         contract = Contract.objects.create(
             number='600/VINC/2026',
@@ -355,15 +356,15 @@ class ViewAndPermissionTests(TestCase):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA CONTRATO NOVO')
         org = Organization.objects.create(acronym='OM-CNT', name='OM Contrato')
-        procurement = Procurement.objects.create(number='93000/2026', object='Objeto base do pregão')
+        procurement = Procurement.objects.create(number='93000/2026')
         ProcurementItem.objects.create(
             procurement=procurement,
             item_number='1',
             nomenclature='Item A',
-            specification='Especificação A',
+            model='Especificação A',
             quantity=Decimal('1'),
             unit='UN',
-            unit_value_estimate=Decimal('10'),
+            unit_value=Decimal('10'),
         )
         create_response = self.client.get(reverse('contract_create'))
         self.assertEqual(create_response.status_code, 200)
@@ -498,18 +499,18 @@ class ViewAndPermissionTests(TestCase):
         item_a = ProcurementItem.objects.create(
             procurement=procurement_a,
             item_number='1',
-            specification='Item do pregão A',
+            model='Item do pregão A',
             quantity=Decimal('2'),
             unit='UN',
-            unit_value_estimate=Decimal('10'),
+            unit_value=Decimal('10'),
         )
         ProcurementItem.objects.create(
             procurement=procurement_b,
             item_number='1',
-            specification='Item do pregão B',
+            model='Item do pregão B',
             quantity=Decimal('3'),
             unit='UN',
-            unit_value_estimate=Decimal('20'),
+            unit_value=Decimal('20'),
         )
         contract = Contract.objects.create(
             number='201/ITEM/2026',
@@ -534,10 +535,10 @@ class ViewAndPermissionTests(TestCase):
         procurement_item = ProcurementItem.objects.create(
             procurement=procurement,
             item_number='1',
-            specification='Item de pregão para OF',
+            model='Item de pregão para OF',
             quantity=Decimal('5'),
             unit='UN',
-            unit_value_estimate=Decimal('100'),
+            unit_value=Decimal('100'),
         )
         ProcurementItemDelivery.objects.create(item=procurement_item, destination=destination, quantity=Decimal('2'))
 
@@ -654,10 +655,10 @@ class ViewAndPermissionTests(TestCase):
         procurement_item = ProcurementItem.objects.create(
             procurement=procurement,
             item_number='10',
-            specification='Item endpoint',
+            model='Item endpoint',
             quantity=Decimal('4'),
             unit='UN',
-            unit_value_estimate=Decimal('10'),
+            unit_value=Decimal('10'),
         )
         ProcurementItemDelivery.objects.create(item=procurement_item, destination=dest, quantity=Decimal('2'))
 
@@ -710,10 +711,10 @@ class ViewAndPermissionTests(TestCase):
             'item_number': '1',
             'code': 'COD-1',
             'nomenclature': 'Teste',
-            'specification': 'Especificação teste',
+            'model': 'Especificação teste',
             'quantity': '1',
             'unit': 'UN',
-            'unit_value_estimate': '10',
+            'unit_value': '10',
             'delivery_locations-TOTAL_FORMS': '1',
             'delivery_locations-INITIAL_FORMS': '0',
             'delivery_locations-MIN_NUM_FORMS': '0',

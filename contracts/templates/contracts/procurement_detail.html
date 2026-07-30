@@ -23,7 +23,7 @@
         <tr>
           <th>Item</th>
           <th>TDV</th>
-          <th>Especificação</th>
+          <th>Modelo/Marca</th>
           <th>Qtd.</th>
           <th>Valor unit.</th>
           <th>Locais de entrega</th>
@@ -36,9 +36,12 @@
           <tr>
             <td>{{ item.item_number }}</td>
             <td>{{ item.code|default:'—' }}</td>
-            <td>{{ item.nomenclature|default:item.specification }}<small>{{ item.specification }}</small></td>
+            <td>
+              {% if item.nomenclature %}<div>{{ item.nomenclature }}</div>{% endif %}
+              {% if item.model or item.brand %}<small>{{ item.model }}{% if item.model and item.brand %} / {% endif %}{{ item.brand }}</small>{% endif %}
+            </td>
             <td>{{ item.quantity|decimal_pt }} {{ item.unit }}</td>
-            <td>{{ item.unit_value_estimate|brl }}</td>
+            <td>{{ item.unit_value|brl }}</td>
             <td>
               {% for delivery in item.delivery_locations.all %}
                 <span class="badge">{{ delivery.destination.acronym }}: {{ delivery.quantity|decimal_pt }}</span>

@@ -108,7 +108,6 @@ class Procurement(TimeStampedModel):
         OTHER = 'OUTRA', 'Outra'
 
     number = models.CharField('número do pregão', max_length=100, unique=True)
-    object = models.TextField('objeto', blank=True)
     requesting_organization = models.ForeignKey(
         Organization,
         verbose_name='OM do termo de referência',
@@ -136,7 +135,7 @@ class Procurement(TimeStampedModel):
 
     @property
     def estimated_value(self):
-        return sum((item.total_value_estimate for item in self.items.all()), Decimal('0'))
+        return sum((item.total_value for item in self.items.all()), Decimal('0'))
 
 
 class ProcurementItem(TimeStampedModel):
@@ -144,14 +143,15 @@ class ProcurementItem(TimeStampedModel):
     item_number = models.CharField('item do pregão', max_length=40)
     code = models.CharField('código/TDV', max_length=100, blank=True)
     nomenclature = models.CharField('nomenclatura', max_length=180, blank=True)
-    specification = models.TextField('especificação')
+    model = models.CharField('modelo', max_length=180, blank=True)
+    brand = models.CharField('marca', max_length=180, blank=True)
     quantity = models.DecimalField(
         'quantidade licitada', max_digits=14, decimal_places=2, default=1,
         validators=[MinValueValidator(Decimal('0'))],
     )
     unit = models.CharField('unidade', max_length=30, default='UN')
-    unit_value_estimate = models.DecimalField(
-        'valor unitário estimado', max_digits=18, decimal_places=2, default=0,
+    unit_value = models.DecimalField(
+        'valor unitário', max_digits=18, decimal_places=2, default=0,
         validators=[MinValueValidator(Decimal('0'))],
     )
 
@@ -164,7 +164,7 @@ class ProcurementItem(TimeStampedModel):
         verbose_name_plural = 'Itens do pregão'
 
     def __str__(self):
-        return f'{self.procurement.number} — Item {self.item_number} — {self.nomenclature or self.specification[:40]}'
+        return f'{self.procurement.number} — Item {self.item_number} — {self.nomenclature or self.model or self.brand or "Item"}'
 
     def clean(self):
         super().clean()
@@ -177,8 +177,12 @@ class ProcurementItem(TimeStampedModel):
             })
 
     @property
+    def total_value(self):
+        return self.quantity * self.unit_value
+
+    @property
     def total_value_estimate(self):
-        return self.quantity * self.unit_value_estimate
+        return self.total_value
 
     @property
     def delivered_locations_quantity(self):
@@ -375,10 +379,10 @@ class Contract(TimeStampedModel):
                 procurement_item=procurement_item.item_number,
                 code=procurement_item.code,
                 nomenclature=procurement_item.nomenclature,
-                description=procurement_item.specification,
+                description=procurement_item.model or procurement_item.brand or procurement_item.nomenclature,
                 quantity=procurement_item.quantity,
                 unit=procurement_item.unit,
-                unit_value=procurement_item.unit_value_estimate,
+                unit_value=procurement_item.unit_value,
             )
             created_count += 1
         return created_count

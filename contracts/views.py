@@ -227,11 +227,9 @@ class ContractCreateView(LoginRequiredMixin, ManagerRequiredMixin, FormMetaMixin
             items = list(procurement.items.all())
             if items:
                 form.instance.object = '; '.join(
-                    (item.nomenclature or item.specification or f'Item {item.item_number}')
+                    (item.nomenclature or item.model or item.brand or f'Item {item.item_number}')
                     for item in items[:8]
                 )
-            elif procurement.object:
-                form.instance.object = procurement.object
         return super().form_valid(form)
 
 
@@ -345,7 +343,7 @@ class ProcurementSummaryView(LoginRequiredMixin, View):
             items.append({
                 'id': item.pk,
                 'item_number': item.item_number,
-                'title': item.nomenclature or item.specification or f'Item {item.item_number}',
+                'title': item.nomenclature or item.model or item.brand or f'Item {item.item_number}',
                 'code': item.code,
                 'quantity': str(item.quantity),
                 'unit': item.unit,
@@ -354,7 +352,6 @@ class ProcurementSummaryView(LoginRequiredMixin, View):
         payload = {
             'id': procurement.pk,
             'number': procurement.number,
-            'object': procurement.object,
             'items': items,
         }
         return JsonResponse(payload)
@@ -778,7 +775,7 @@ def _procurement_report_rows():
     for procurement in Procurement.objects.select_related('requesting_organization').prefetch_related('items'):
         rows.append([
             procurement.number,
-            procurement.object,
+            '',
             procurement.requesting_organization.acronym if procurement.requesting_organization else '',
             procurement.get_status_display(),
             procurement.opening_date,
@@ -789,7 +786,7 @@ def _procurement_report_rows():
 
 
 PROCUREMENT_REPORT_HEADERS = [
-    'Pregão', 'Objeto', 'OM requisitante', 'Situação', 'Abertura', 'Itens', 'Valor estimado',
+    'Pregão', 'OM requisitante', 'Situação', 'Abertura', 'Itens', 'Valor estimado',
 ]
 
 
