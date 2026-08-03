@@ -73,4 +73,78 @@
     <button class="button primary" type="submit">Salvar</button>
   </div>
 </form>
+<script>
+(() => {
+  const currencyInputs = Array.from(document.querySelectorAll('input[data-currency="brl"]'));
+  if (!currencyInputs.length) return;
+
+  const parseCurrencyToCanonical = (value) => {
+    if (value === null || value === undefined) return '';
+    let text = String(value).trim();
+    if (!text) return '';
+    text = text.replace(/\s/g, '').replace(/^R\$\s?/i, '');
+    const sign = text.startsWith('-') ? '-' : '';
+    text = text.replace(/[^0-9,.-]/g, '').replace(/-/g, '');
+    if (!text) return '';
+
+    const lastComma = text.lastIndexOf(',');
+    const lastDot = text.lastIndexOf('.');
+    let decimalSep = '';
+    if (lastComma >= 0 || lastDot >= 0) {
+      decimalSep = lastComma > lastDot ? ',' : '.';
+    }
+
+    let intPart = text;
+    let fracPart = '';
+    if (decimalSep) {
+      const idx = text.lastIndexOf(decimalSep);
+      intPart = text.slice(0, idx);
+      fracPart = text.slice(idx + 1);
+    }
+
+    intPart = intPart.replace(/[.,]/g, '').replace(/^0+(?=\d)/, '');
+    fracPart = fracPart.replace(/[.,]/g, '');
+    if (!intPart) intPart = '0';
+    fracPart = (fracPart + '00').slice(0, 2);
+    return `${sign}${intPart}.${fracPart}`;
+  };
+
+  const formatCanonical = (canonical, withSymbol = true) => {
+    if (!canonical) return '';
+    const numeric = Number(canonical);
+    if (Number.isNaN(numeric)) return '';
+    return new Intl.NumberFormat('pt-BR', {
+      style: withSymbol ? 'currency' : 'decimal',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numeric);
+  };
+
+  for (const input of currencyInputs) {
+    const canonical = parseCurrencyToCanonical(input.value);
+    input.value = canonical ? formatCanonical(canonical, true) : '';
+
+    input.addEventListener('focus', () => {
+      const current = parseCurrencyToCanonical(input.value);
+      input.value = current ? formatCanonical(current, false) : '';
+    });
+
+    input.addEventListener('blur', () => {
+      const current = parseCurrencyToCanonical(input.value);
+      input.value = current ? formatCanonical(current, true) : '';
+    });
+  }
+
+  const forms = new Set(currencyInputs.map((input) => input.form).filter(Boolean));
+  for (const form of forms) {
+    form.addEventListener('submit', () => {
+      for (const input of currencyInputs) {
+        if (input.form !== form || input.disabled) continue;
+        input.value = parseCurrencyToCanonical(input.value);
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}
