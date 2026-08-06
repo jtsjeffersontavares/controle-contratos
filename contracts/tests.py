@@ -224,6 +224,30 @@ class ViewAndPermissionTests(TestCase):
         template_rows = read_xlsx_sheet(SimpleUploadedFile('modelo.xlsx', template_response.content), 'Planilha1')
         self.assertEqual(template_rows[0][0], 'STATUS')
 
+    def test_dashboard_counts_closed_contracts_and_excludes_them_from_upcoming(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA DASHBOARD')
+        org = Organization.objects.create(acronym='OM-DASH', name='OM Dashboard')
+        closed_contract = Contract.objects.create(
+            number='006/DASHBOARD/2026', supplier=supplier, managing_organization=org,
+            status=Contract.Status.CLOSED, current_value=Decimal('100'), initial_value=Decimal('100'),
+            end_date=timezone.localdate() + timedelta(days=30),
+        )
+        expiring_contract = Contract.objects.create(
+            number='007/DASHBOARD/2026', supplier=supplier, managing_organization=org,
+            status=Contract.Status.ACTIVE, current_value=Decimal('200'), initial_value=Decimal('200'),
+            end_date=timezone.localdate() + timedelta(days=30),
+        )
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['closed_contracts'], 1)
+        self.assertEqual(response.context['expiring_contracts'], 1)
+        self.assertTrue(any(card['label'] == 'Encerrados' for card in response.context['status_cards']))
+        self.assertNotIn(closed_contract, response.context['upcoming_contracts'])
+        self.assertIn(expiring_contract, response.context['upcoming_contracts'])
+
     def test_main_pages_render(self):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA PÁGINAS')

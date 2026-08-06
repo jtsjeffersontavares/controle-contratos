@@ -84,7 +84,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         for row in top_destinations:
             row['bar_percent'] = float((row['total'] or 0) * 100 / max_destination) if max_destination else 0
         upcoming = sorted(
-            [contract for contract in contracts if contract.days_to_expiry is not None and 0 <= contract.days_to_expiry <= 90],
+            [
+                contract for contract in contracts
+                if contract.calculated_status != Contract.Status.CLOSED
+                and contract.days_to_expiry is not None
+                and 0 <= contract.days_to_expiry <= 90
+            ],
             key=lambda item: item.days_to_expiry,
         )[:10]
         overdue_orders = sorted(
@@ -97,6 +102,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'active_contracts': status_counts[Contract.Status.ACTIVE],
             'expiring_contracts': status_counts[Contract.Status.EXPIRING],
             'expired_contracts': status_counts[Contract.Status.EXPIRED],
+            'closed_contracts': status_counts[Contract.Status.CLOSED],
             'open_paai': AdministrativeProcess.objects.exclude(status=AdministrativeProcess.Status.ARCHIVED).count(),
             'overdue_orders_count': order_status_counts[SupplyOrder.Status.OVERDUE],
             'delivery_percent': min(Decimal('100'), delivery_percent),
@@ -108,6 +114,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 {'label': 'Vigentes', 'value': status_counts[Contract.Status.ACTIVE], 'class': 'success'},
                 {'label': 'Vencendo em 90 dias', 'value': status_counts[Contract.Status.EXPIRING], 'class': 'warning'},
                 {'label': 'Vencidos', 'value': status_counts[Contract.Status.EXPIRED], 'class': 'danger'},
+                {'label': 'Encerrados', 'value': status_counts[Contract.Status.CLOSED], 'class': 'neutral'},
                 {'label': 'Sem data/rascunho', 'value': status_counts[Contract.Status.DRAFT], 'class': 'neutral'},
             ],
         })
