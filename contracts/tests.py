@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import Group, User
@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from .forms import ContractForm
 from .import_service import import_preview, preview_workbook
 from .models import Contract, Delivery, Document, Organization, Procurement, ProcurementItem, ProcurementItemDelivery, Supplier, SupplyOrder
 from .xlsx_utils import read_xlsx_sheet, write_simple_xlsx
@@ -81,6 +82,19 @@ class ContractModelTests(TestCase):
         )
         self.assertEqual(contract.calculated_status, Contract.Status.EXPIRING)
         self.assertEqual(contract.days_to_expiry, 30)
+
+    def test_contract_form_renders_saved_dates_in_html5_format(self):
+        contract = Contract.objects.create(
+            number='005/FORM/2026', supplier=self.supplier, managing_organization=self.org,
+            signature_date=date(2024, 1, 15), start_date=date(2024, 1, 1), end_date=date(2024, 12, 31),
+            initial_value=Decimal('100'), current_value=Decimal('100'),
+        )
+
+        form = ContractForm(instance=contract)
+
+        self.assertIn('value="2024-01-15"', form['signature_date'].as_widget())
+        self.assertIn('value="2024-01-01"', form['start_date'].as_widget())
+        self.assertIn('value="2024-12-31"', form['end_date'].as_widget())
 
     def test_copy_items_from_procurement(self):
         procurement = Procurement.objects.create(number='90000/2026')

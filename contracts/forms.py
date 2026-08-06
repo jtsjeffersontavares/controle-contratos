@@ -17,7 +17,7 @@ from .models import (
     SupplyOrder,
 )
 
-DATE_WIDGET = forms.DateInput(attrs={'type': 'date'})
+DATE_WIDGET = forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'})
 TEXTAREA_WIDGET = forms.Textarea(attrs={'rows': 3})
 
 
