@@ -109,7 +109,7 @@
       PRAZO: ['deadline_scope', 'old_end_date', 'new_end_date'],
       VALOR: ['value_change', 'commitment', 'commitment_mode', 'new_commitment_number'],
     };
-    const alwaysVisible = new Set(['contract', 'change_type', 'number', 'status', 'justification', 'signed_date']);
+    const alwaysVisible = new Set(['contract', 'change_type', 'number', 'justification']);
 
     const allFields = document.querySelectorAll('div.form-field');
     allFields.forEach((field) => {

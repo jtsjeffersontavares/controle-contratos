@@ -293,12 +293,11 @@ class ContractChangeForm(StyledModelForm):
     class Meta:
         model = ContractChange
         fields = [
-            'contract', 'change_type', 'number', 'signed_date',
+            'contract', 'change_type', 'number',
             'item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date',
-            'value_change', 'commitment', 'commitment_mode', 'new_commitment_number', 'status', 'justification',
+            'value_change', 'commitment', 'commitment_mode', 'new_commitment_number', 'justification',
         ]
         widgets = {
-            'signed_date': DATE_WIDGET,
             'old_end_date': DATE_WIDGET,
             'new_end_date': DATE_WIDGET,
             'justification': TEXTAREA_WIDGET,
