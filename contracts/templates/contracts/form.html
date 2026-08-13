@@ -94,11 +94,61 @@
     }
   }
 
+  const changeTypeSelect = document.getElementById('id_change_type');
   const itemSelect = document.getElementById('id_item');
+  const oldQuantityInput = document.getElementById('id_old_quantity');
   const contractSelect = document.getElementById('id_contract');
   const destinationHelp = document.getElementById('id_destination_helptext');
   const procurementDestinationsField = document.getElementById('id_procurement_destinations');
   const itemLocationsRaw = document.getElementById('item-locations-map');
+
+  const toggleChangeFields = () => {
+    const type = changeTypeSelect ? changeTypeSelect.value : '';
+    const sections = {
+      QUANTIDADE: ['id_item', 'id_old_quantity', 'id_new_quantity'],
+      PRAZO: ['id_deadline_scope', 'id_old_end_date', 'id_new_end_date'],
+      VALOR: ['id_value_change', 'id_commitment', 'id_commitment_mode', 'id_new_commitment_number'],
+    };
+
+    const allFields = document.querySelectorAll('div.form-field');
+    allFields.forEach((field) => {
+      const label = field.querySelector('label');
+      const input = field.querySelector('input, select, textarea');
+      if (!input || !label) return;
+      const fieldId = input.id || '';
+      const shouldShow = Object.values(sections).flat().includes(fieldId) && (type ? sections[type].includes(fieldId) : false);
+      field.style.display = shouldShow ? '' : 'none';
+      if (input.id === 'id_request_date') {
+        field.style.display = '';
+      }
+    });
+
+    if (changeTypeSelect && oldQuantityInput && itemSelect) {
+      const selectedItemId = itemSelect.value;
+      if (type === 'QUANTIDADE' && selectedItemId) {
+        const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+        const match = selectedOption && selectedOption.textContent.match(/Qtd atual:\s*([0-9.,]+)/);
+        if (match && oldQuantityInput) {
+          oldQuantityInput.value = match[1].replace('.', '').replace(',', '.');
+        }
+      }
+    }
+  };
+
+  if (changeTypeSelect) {
+    changeTypeSelect.addEventListener('change', toggleChangeFields);
+  }
+  if (itemSelect) {
+    itemSelect.addEventListener('change', () => {
+      const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+      const match = selectedOption && selectedOption.textContent.match(/Qtd atual:\s*([0-9.,]+)/);
+      if (match && oldQuantityInput) {
+        oldQuantityInput.value = match[1].replace('.', '').replace(',', '.');
+      }
+      toggleChangeFields();
+    });
+  }
+  toggleChangeFields();
   if (itemSelect) {
     const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
     const defaultText = destinationHelp ? (destinationHelp.textContent || '') : '';

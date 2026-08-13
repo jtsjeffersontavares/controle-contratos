@@ -674,6 +674,29 @@ class ViewAndPermissionTests(TestCase):
         self.assertContains(response, 'R$ 1.500,00')
         self.assertContains(response, 'R$ 1.800,00')
 
+    def test_change_form_uses_only_three_types_and_auto_request_date(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA ALTERACAO')
+        org = Organization.objects.create(acronym='OM-ALT', name='OM Alteracao')
+        contract = Contract.objects.create(
+            number='888/ALT/2026',
+            supplier=supplier,
+            managing_organization=org,
+            initial_value=Decimal('1000'),
+            current_value=Decimal('1000'),
+        )
+
+        response = self.client.get(reverse('change_create') + f'?contract={contract.pk}')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Número do subprocesso')
+        self.assertContains(response, 'QUANTIDADE')
+        self.assertContains(response, 'PRAZO')
+        self.assertContains(response, 'VALOR')
+        self.assertNotContains(response, 'Termo aditivo')
+        self.assertNotContains(response, 'Reajuste')
+        self.assertContains(response, 'name="request_date"')
+        self.assertContains(response, timezone.localdate().strftime('%Y-%m-%d'))
+
     def test_contract_detail_shows_procurement_edit_rule_message(self):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA AVISO PREGAO')

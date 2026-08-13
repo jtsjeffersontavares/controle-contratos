@@ -593,21 +593,33 @@ class Delivery(TimeStampedModel):
 
 class ContractChange(TimeStampedModel):
     class ChangeType(models.TextChoices):
-        ADDENDUM = 'ADITIVO', 'Termo aditivo'
-        ADJUSTMENT = 'REAJUSTE', 'Reajuste'
-        REPACTUATION = 'REPACTUACAO', 'Repactuação'
-        APOSTILLE = 'APOSTILAMENTO', 'Apostilamento'
-        EXTENSION = 'PRORROGACAO', 'Prorrogação'
-        SUPPRESSION = 'SUPRESSAO', 'Supressão'
+        QUANTITY = 'QUANTIDADE', 'Quantidade'
+        DEADLINE = 'PRAZO', 'Prazo'
+        VALUE = 'VALOR', 'Valor'
+
+    class DeadlineScope(models.TextChoices):
+        CONTRACT = 'CONTRATO', 'Prazo do contrato'
+        EXECUTION = 'EXECUCAO', 'Prazo da execução'
+
+    class CommitmentMode(models.TextChoices):
+        SELECT = 'SELECIONAR', 'Selecionar empenho'
+        CREATE = 'CRIAR', 'Criar empenho'
 
     contract = models.ForeignKey(Contract, verbose_name='contrato', on_delete=models.CASCADE, related_name='changes')
     change_type = models.CharField('tipo', max_length=20, choices=ChangeType.choices)
-    number = models.CharField('número/referência', max_length=100)
+    number = models.CharField('número do subprocesso', max_length=100)
     request_date = models.DateField('data da solicitação', null=True, blank=True)
     signed_date = models.DateField('data da assinatura', null=True, blank=True)
+    item = models.ForeignKey(ContractItem, verbose_name='item', on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_changes')
+    old_quantity = models.DecimalField('quantidade anterior', max_digits=14, decimal_places=2, default=0, blank=True)
+    new_quantity = models.DecimalField('nova quantidade', max_digits=14, decimal_places=2, default=0, blank=True)
+    deadline_scope = models.CharField('tipo de prazo', max_length=20, choices=DeadlineScope.choices, default=DeadlineScope.CONTRACT, blank=True)
     old_end_date = models.DateField('vigência anterior', null=True, blank=True)
     new_end_date = models.DateField('nova vigência', null=True, blank=True)
     value_change = models.DecimalField('alteração de valor', max_digits=18, decimal_places=2, default=0)
+    commitment = models.ForeignKey(Commitment, verbose_name='empenho relacionado', on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_changes')
+    commitment_mode = models.CharField('tipo de empenho', max_length=20, choices=CommitmentMode.choices, default=CommitmentMode.SELECT, blank=True)
+    new_commitment_number = models.CharField('nova nota de empenho', max_length=100, blank=True)
     status = models.CharField('andamento', max_length=100, default='Em elaboração')
     justification = models.TextField('justificativa', blank=True)
 

@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 
 from .models import (
     AdministrativeProcess,
@@ -293,7 +294,8 @@ class ContractChangeForm(StyledModelForm):
         model = ContractChange
         fields = [
             'contract', 'change_type', 'number', 'request_date', 'signed_date',
-            'old_end_date', 'new_end_date', 'value_change', 'status', 'justification',
+            'item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date',
+            'value_change', 'commitment', 'commitment_mode', 'new_commitment_number', 'status', 'justification',
         ]
         widgets = {
             'request_date': DATE_WIDGET,
@@ -302,6 +304,103 @@ class ContractChangeForm(StyledModelForm):
             'new_end_date': DATE_WIDGET,
             'justification': TEXTAREA_WIDGET,
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk and not self.data.get(self.add_prefix('request_date')):
+            self.initial['request_date'] = timezone.localdate()
+        self.fields['request_date'].widget.attrs['readonly'] = 'readonly'
+
+        self.fields['change_type'].choices = [
+            (ContractChange.ChangeType.QUANTITY, 'QUANTIDADE'),
+            (ContractChange.ChangeType.DEADLINE, 'PRAZO'),
+            (ContractChange.ChangeType.VALUE, 'VALOR'),
+        ]
+
+        self.fields['item'].queryset = self._get_contract_items_queryset()
+        self.fields['item'].label_from_instance = lambda item: (
+            f'Item {item.procurement_item or "s/n"} — {item.nomenclature or item.description[:40]} '
+            f'(Qtd atual: {item.quantity})'
+        )
+        self.fields['commitment'].queryset = self._get_commitment_queryset()
+        self.fields['old_quantity'].widget.attrs['readonly'] = 'readonly'
+        self.fields['old_quantity'].help_text = 'Quantidade atual do item selecionado.'
+        self._apply_field_visibility()
+
+    def _get_contract_items_queryset(self):
+        contract_id = (self.data.get(self.add_prefix('contract')) if self.data else None) or getattr(self.instance, 'contract_id', None) or self.initial.get('contract')
+        if not contract_id:
+            return ContractItem.objects.none()
+        return ContractItem.objects.filter(contract_id=contract_id).order_by('procurement_item', 'code')
+
+    def _get_commitment_queryset(self):
+        contract_id = (self.data.get(self.add_prefix('contract')) if self.data else None) or getattr(self.instance, 'contract_id', None) or self.initial.get('contract')
+        if not contract_id:
+            return Commitment.objects.none()
+        return Commitment.objects.filter(contract_id=contract_id).order_by('-issue_date', 'number')
+
+    def _apply_field_visibility(self):
+        change_type = self.data.get(self.add_prefix('change_type')) or getattr(self.instance, 'change_type', '')
+        for field_name in ['item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date', 'value_change', 'commitment', 'commitment_mode', 'new_commitment_number']:
+            field = self.fields.get(field_name)
+            if field is None:
+                continue
+            field.required = False
+            field.widget.attrs['style'] = 'display: none;'
+
+        if change_type == ContractChange.ChangeType.QUANTITY:
+            for field_name in ['item', 'old_quantity', 'new_quantity']:
+                self.fields[field_name].widget.attrs.pop('style', None)
+                self.fields[field_name].required = True
+            self.fields['old_quantity'].help_text = 'Quantidade atual do item selecionado.'
+            self.fields['new_quantity'].help_text = 'Informe a nova quantidade.'
+            if self.instance.pk and self.instance.item_id:
+                self.initial['old_quantity'] = self.instance.item.quantity
+            elif self.data.get(self.add_prefix('item')):
+                selected_item = ContractItem.objects.filter(pk=self.data.get(self.add_prefix('item'))).first()
+                if selected_item:
+                    self.initial['old_quantity'] = selected_item.quantity
+        elif change_type == ContractChange.ChangeType.DEADLINE:
+            for field_name in ['deadline_scope', 'old_end_date', 'new_end_date']:
+                self.fields[field_name].widget.attrs.pop('style', None)
+            self.fields['deadline_scope'].required = True
+            self.fields['new_end_date'].required = True
+            if self.instance.pk and self.instance.old_end_date:
+                self.initial['old_end_date'] = self.instance.old_end_date
+        elif change_type == ContractChange.ChangeType.VALUE:
+            for field_name in ['value_change', 'commitment', 'commitment_mode', 'new_commitment_number']:
+                self.fields[field_name].widget.attrs.pop('style', None)
+            self.fields['value_change'].required = True
+            self.fields['commitment_mode'].required = True
+            self.fields['commitment'].required = False
+            self.fields['new_commitment_number'].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        change_type = cleaned.get('change_type')
+        request_date = cleaned.get('request_date')
+        if not request_date and not self.instance.pk:
+            cleaned['request_date'] = timezone.localdate()
+
+        if change_type == ContractChange.ChangeType.QUANTITY:
+            item = cleaned.get('item')
+            old_quantity = cleaned.get('old_quantity')
+            new_quantity = cleaned.get('new_quantity')
+            if item:
+                cleaned['old_quantity'] = item.quantity if old_quantity in (None, '') else old_quantity
+            if item and new_quantity is not None and new_quantity == old_quantity:
+                self.add_error('new_quantity', 'A nova quantidade deve ser diferente da quantidade atual.')
+        elif change_type == ContractChange.ChangeType.DEADLINE:
+            old_end_date = cleaned.get('old_end_date')
+            new_end_date = cleaned.get('new_end_date')
+            if new_end_date and old_end_date and new_end_date < old_end_date:
+                self.add_error('new_end_date', 'O novo prazo não pode ser anterior ao prazo atual.')
+        elif change_type == ContractChange.ChangeType.VALUE:
+            value_change = cleaned.get('value_change')
+            if value_change is not None and value_change == 0:
+                self.add_error('value_change', 'Informe o valor da alteração.')
+
+        return cleaned
 
 
 class AdministrativeProcessForm(StyledModelForm):
