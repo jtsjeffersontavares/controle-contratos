@@ -105,18 +105,18 @@
   const toggleChangeFields = () => {
     const type = changeTypeSelect ? changeTypeSelect.value : '';
     const sections = {
-      QUANTIDADE: ['id_item', 'id_old_quantity', 'id_new_quantity'],
-      PRAZO: ['id_deadline_scope', 'id_old_end_date', 'id_new_end_date'],
-      VALOR: ['id_value_change', 'id_commitment', 'id_commitment_mode', 'id_new_commitment_number'],
+      QUANTIDADE: ['item', 'old_quantity', 'new_quantity'],
+      PRAZO: ['deadline_scope', 'old_end_date', 'new_end_date'],
+      VALOR: ['value_change', 'commitment', 'commitment_mode', 'new_commitment_number'],
     };
-    const alwaysVisible = new Set(['id_contract', 'id_change_type', 'id_status', 'id_justification']);
+    const alwaysVisible = new Set(['contract', 'change_type', 'number', 'status', 'justification', 'signed_date']);
 
     const allFields = document.querySelectorAll('div.form-field');
     allFields.forEach((field) => {
       const input = field.querySelector('input, select, textarea');
       if (!input) return;
-      const fieldId = input.id || '';
-      const shouldShow = alwaysVisible.has(fieldId) || input.name === 'number' || (type && sections[type].includes(fieldId));
+      const fieldName = input.name || '';
+      const shouldShow = alwaysVisible.has(fieldName) || (type && sections[type].includes(fieldName));
       field.style.display = shouldShow ? '' : 'none';
     });
 
