@@ -5,6 +5,7 @@
   <div><span>Status calculado</span><strong><span class="badge {{ contract.calculated_status|status_class }}">{{ contract.calculated_status_label }}</span></strong></div>
   <div><span>Vigência final</span><strong>{{ contract.end_date|date:'d/m/Y'|default:'Sem data' }}</strong></div>
   <div><span>Dias para vencer</span><strong>{{ contract.days_to_expiry|default_if_none:'—' }}</strong></div>
+  <div><span>Valor inicial</span><strong>{{ contract.initial_value|brl }}</strong></div>
   <div><span>Valor atualizado</span><strong>{{ contract.current_value|brl }}</strong></div>
   <div><span>Empenhado</span><strong>{{ contract.committed_value|brl }}</strong></div>
   <div><span>Saldo</span><strong>{{ contract.balance|brl }}</strong></div>

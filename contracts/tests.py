@@ -655,6 +655,25 @@ class ViewAndPermissionTests(TestCase):
         order.refresh_from_db()
         self.assertEqual(order.procurement_destinations, 'OM-DST (2.00)')
 
+    def test_contract_detail_shows_initial_and_updated_values(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+        supplier = Supplier.objects.create(name='EMPRESA VALOR INICIAL')
+        org = Organization.objects.create(acronym='OM-VAL', name='OM Valor')
+        contract = Contract.objects.create(
+            number='777/VAL/2026',
+            supplier=supplier,
+            managing_organization=org,
+            initial_value=Decimal('1500.00'),
+            current_value=Decimal('1800.00'),
+        )
+
+        response = self.client.get(reverse('contract_detail', args=[contract.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Valor inicial')
+        self.assertContains(response, 'Valor atualizado')
+        self.assertContains(response, 'R$ 1.500,00')
+        self.assertContains(response, 'R$ 1.800,00')
+
     def test_contract_detail_shows_procurement_edit_rule_message(self):
         self.client.login(username='gestor', password='SenhaForte123!')
         supplier = Supplier.objects.create(name='EMPRESA AVISO PREGAO')
