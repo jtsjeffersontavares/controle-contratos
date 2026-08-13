@@ -633,6 +633,8 @@ class ViewAndPermissionTests(TestCase):
         self.assertContains(response, 'name="procurement_destinations"')
         self.assertContains(response, 'id="id_procurement_destinations"')
         self.assertContains(response, 'disabled')
+        self.assertNotContains(response, 'id="id_reported_delivery"')
+        self.assertNotContains(response, 'id="id_reported_delivery_date_text"')
 
         post_response = self.client.post(reverse('supplyorder_update', args=[order.pk]), {
             'contract': contract.pk,
@@ -647,8 +649,6 @@ class ViewAndPermissionTests(TestCase):
             'quantity': '2',
             'value': '200',
             'status': SupplyOrder.Status.NOT_INFORMED,
-            'reported_delivery': '',
-            'reported_delivery_date_text': '',
             'notes': '',
         })
         self.assertEqual(post_response.status_code, 302)

@@ -201,8 +201,7 @@ class SupplyOrderForm(StyledModelForm):
         model = SupplyOrder
         fields = [
             'contract', 'item', 'commitment', 'procurement_destinations', 'destination', 'official_reference',
-            'issue_date', 'sent_date', 'deadline', 'quantity', 'value', 'status',
-            'reported_delivery', 'reported_delivery_date_text', 'notes',
+            'issue_date', 'sent_date', 'deadline', 'quantity', 'value', 'status', 'notes',
         ]
         widgets = {
             'procurement_destinations': forms.Textarea(attrs={'rows': 2}),
