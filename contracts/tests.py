@@ -694,8 +694,8 @@ class ViewAndPermissionTests(TestCase):
         self.assertContains(response, 'VALOR')
         self.assertNotContains(response, 'Termo aditivo')
         self.assertNotContains(response, 'Reajuste')
-        self.assertContains(response, 'name="request_date"')
-        self.assertContains(response, timezone.localdate().strftime('%Y-%m-%d'))
+        self.assertNotContains(response, 'Data da solicitação')
+        self.assertNotContains(response, 'name="request_date"')
 
     def test_contract_detail_shows_procurement_edit_rule_message(self):
         self.client.login(username='gestor', password='SenhaForte123!')

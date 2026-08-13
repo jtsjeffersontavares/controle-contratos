@@ -109,18 +109,15 @@
       PRAZO: ['id_deadline_scope', 'id_old_end_date', 'id_new_end_date'],
       VALOR: ['id_value_change', 'id_commitment', 'id_commitment_mode', 'id_new_commitment_number'],
     };
+    const alwaysVisible = new Set(['id_contract', 'id_change_type', 'id_status', 'id_justification']);
 
     const allFields = document.querySelectorAll('div.form-field');
     allFields.forEach((field) => {
-      const label = field.querySelector('label');
       const input = field.querySelector('input, select, textarea');
-      if (!input || !label) return;
+      if (!input) return;
       const fieldId = input.id || '';
-      const shouldShow = Object.values(sections).flat().includes(fieldId) && (type ? sections[type].includes(fieldId) : false);
+      const shouldShow = alwaysVisible.has(fieldId) || input.name === 'number' || (type && sections[type].includes(fieldId));
       field.style.display = shouldShow ? '' : 'none';
-      if (input.id === 'id_request_date') {
-        field.style.display = '';
-      }
     });
 
     if (changeTypeSelect && oldQuantityInput && itemSelect) {

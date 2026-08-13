@@ -293,12 +293,11 @@ class ContractChangeForm(StyledModelForm):
     class Meta:
         model = ContractChange
         fields = [
-            'contract', 'change_type', 'number', 'request_date', 'signed_date',
+            'contract', 'change_type', 'number', 'signed_date',
             'item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date',
             'value_change', 'commitment', 'commitment_mode', 'new_commitment_number', 'status', 'justification',
         ]
         widgets = {
-            'request_date': DATE_WIDGET,
             'signed_date': DATE_WIDGET,
             'old_end_date': DATE_WIDGET,
             'new_end_date': DATE_WIDGET,
@@ -307,10 +306,6 @@ class ContractChangeForm(StyledModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.instance.pk and not self.data.get(self.add_prefix('request_date')):
-            self.initial['request_date'] = timezone.localdate()
-        self.fields['request_date'].widget.attrs['readonly'] = 'readonly'
-
         self.fields['change_type'].choices = [
             (ContractChange.ChangeType.QUANTITY, 'QUANTIDADE'),
             (ContractChange.ChangeType.DEADLINE, 'PRAZO'),
@@ -341,6 +336,12 @@ class ContractChangeForm(StyledModelForm):
 
     def _apply_field_visibility(self):
         change_type = self.data.get(self.add_prefix('change_type')) or getattr(self.instance, 'change_type', '')
+        for field_name in ['contract', 'change_type', 'number', 'signed_date', 'item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date', 'value_change', 'commitment', 'commitment_mode', 'new_commitment_number', 'status', 'justification']:
+            field = self.fields.get(field_name)
+            if field is None:
+                continue
+            field.widget.attrs.pop('style', None)
+
         for field_name in ['item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date', 'value_change', 'commitment', 'commitment_mode', 'new_commitment_number']:
             field = self.fields.get(field_name)
             if field is None:
@@ -378,9 +379,6 @@ class ContractChangeForm(StyledModelForm):
     def clean(self):
         cleaned = super().clean()
         change_type = cleaned.get('change_type')
-        request_date = cleaned.get('request_date')
-        if not request_date and not self.instance.pk:
-            cleaned['request_date'] = timezone.localdate()
 
         if change_type == ContractChange.ChangeType.QUANTITY:
             item = cleaned.get('item')
@@ -401,6 +399,10 @@ class ContractChangeForm(StyledModelForm):
                 self.add_error('value_change', 'Informe o valor da alteração.')
 
         return cleaned
+
+    def save(self, commit=True):
+        self.instance.request_date = timezone.localdate()
+        return super().save(commit=commit)
 
 
 class AdministrativeProcessForm(StyledModelForm):
