@@ -120,17 +120,17 @@ uses_postgres = DB_ENGINE in {'postgres', 'postgresql'} or (
 
 if uses_postgres:
     if parsed_database_url is not None:
-        database_name = parsed_database_url.path.lstrip('/') or os.getenv('POSTGRES_DB', 'gestao_contratos')
-        database_user = parsed_database_url.username or os.getenv('POSTGRES_USER', 'gestao_contratos')
-        database_password = parsed_database_url.password or os.getenv('POSTGRES_PASSWORD', '')
-        database_host = parsed_database_url.hostname or os.getenv('POSTGRES_HOST', 'db')
-        database_port = str(parsed_database_url.port or os.getenv('POSTGRES_PORT', '5432'))
+        database_name = parsed_database_url.path.lstrip('/') or os.getenv('POSTGRES_DB', os.getenv('PGDATABASE', 'postgres'))
+        database_user = parsed_database_url.username or os.getenv('PGUSER', os.getenv('POSTGRES_USER', 'postgres'))
+        database_password = parsed_database_url.password or os.getenv('PGPASSWORD', os.getenv('POSTGRES_PASSWORD', ''))
+        database_host = parsed_database_url.hostname or os.getenv('PGHOST', os.getenv('POSTGRES_HOST', 'localhost'))
+        database_port = str(parsed_database_url.port or os.getenv('PGPORT', os.getenv('POSTGRES_PORT', '5432')))
     else:
-        database_name = os.getenv('POSTGRES_DB', 'gestao_contratos')
-        database_user = os.getenv('POSTGRES_USER', 'gestao_contratos')
-        database_password = os.getenv('POSTGRES_PASSWORD', '')
-        database_host = os.getenv('POSTGRES_HOST', 'db')
-        database_port = os.getenv('POSTGRES_PORT', '5432')
+        database_name = os.getenv('POSTGRES_DB', os.getenv('PGDATABASE', 'postgres'))
+        database_user = os.getenv('PGUSER', os.getenv('POSTGRES_USER', 'postgres'))
+        database_password = os.getenv('PGPASSWORD', os.getenv('POSTGRES_PASSWORD', ''))
+        database_host = os.getenv('PGHOST', os.getenv('POSTGRES_HOST', 'localhost'))
+        database_port = os.getenv('PGPORT', os.getenv('POSTGRES_PORT', '5432'))
 
     DATABASES = {
         'default': {
