@@ -140,6 +140,14 @@ class Procurement(TimeStampedModel):
 
 class ProcurementItem(TimeStampedModel):
     procurement = models.ForeignKey(Procurement, verbose_name='pregão', on_delete=models.CASCADE, related_name='items')
+    supplier = models.ForeignKey(
+        Supplier,
+        verbose_name='empresa',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='procurement_items',
+    )
     item_number = models.CharField('item do pregão', max_length=40)
     code = models.CharField('código/TDV', max_length=100, blank=True)
     nomenclature = models.CharField('nomenclatura', max_length=180, blank=True)
@@ -593,169 +601,81 @@ class Delivery(TimeStampedModel):
 
 class ContractChange(TimeStampedModel):
     class ChangeType(models.TextChoices):
-        QUANTITY = 'QUANTIDADE', 'Quantidade'
-        DEADLINE = 'PRAZO', 'Prazo'
-        VALUE = 'VALOR', 'Valor'
-
-    class DeadlineScope(models.TextChoices):
-        CONTRACT = 'CONTRATO', 'Prazo do contrato'
-        EXECUTION = 'EXECUCAO', 'Prazo da execução'
-
-    class CommitmentMode(models.TextChoices):
-        SELECT = 'SELECIONAR', 'Selecionar empenho'
-        CREATE = 'CRIAR', 'Criar empenho'
+        QUANTITY = 'QUANTIDADE', 'Alteração de Quantidade'
+        DEADLINE = 'PRAZO', 'Alteração de Prazo'
+        VALUE = 'VALOR', 'Alteração de Valor'
 
     contract = models.ForeignKey(Contract, verbose_name='contrato', on_delete=models.CASCADE, related_name='changes')
-    change_type = models.CharField('tipo', max_length=20, choices=ChangeType.choices)
-    number = models.CharField('número do subprocesso', max_length=100)
-    request_date = models.DateField('data da solicitação', null=True, blank=True)
-    signed_date = models.DateField('data da assinatura', null=True, blank=True)
-    item = models.ForeignKey(ContractItem, verbose_name='item', on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_changes')
-    old_quantity = models.DecimalField('quantidade anterior', max_digits=14, decimal_places=2, default=0, blank=True)
-    new_quantity = models.DecimalField('nova quantidade', max_digits=14, decimal_places=2, default=0, blank=True)
-    deadline_scope = models.CharField('tipo de prazo', max_length=20, choices=DeadlineScope.choices, default=DeadlineScope.CONTRACT, blank=True)
-    old_end_date = models.DateField('vigência anterior', null=True, blank=True)
-    new_end_date = models.DateField('nova vigência', null=True, blank=True)
-    value_change = models.DecimalField('alteração de valor', max_digits=18, decimal_places=2, default=0)
-    commitment = models.ForeignKey(Commitment, verbose_name='empenho relacionado', on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_changes')
-    commitment_mode = models.CharField('tipo de empenho', max_length=20, choices=CommitmentMode.choices, default=CommitmentMode.SELECT, blank=True)
-    new_commitment_number = models.CharField('nova nota de empenho', max_length=100, blank=True)
-    status = models.CharField('andamento', max_length=100, default='Em elaboração')
+    change_type = models.CharField('tipo de alteração', max_length=20, choices=ChangeType.choices)
+    number = models.CharField('número da alteração', max_length=100)
+    request_date = models.DateField('data da solicitação', auto_now_add=True)
+    item = models.ForeignKey(ContractItem, verbose_name='item', on_delete=models.SET_NULL, null=True, blank=True, related_name='changes')
+    old_quantity = models.DecimalField('quantidade anterior', max_digits=14, decimal_places=2, null=True, blank=True)
+    new_quantity = models.DecimalField('nova quantidade', max_digits=14, decimal_places=2, null=True, blank=True)
+    deadline_scope = models.CharField('escopo da alteração de prazo', max_length=120, blank=True)
+    old_end_date = models.DateField('prazo anterior', null=True, blank=True)
+    new_end_date = models.DateField('novo prazo', null=True, blank=True)
+    value_change = models.DecimalField('alteração do valor', max_digits=18, decimal_places=2, null=True, blank=True)
+    commitment = models.ForeignKey(Commitment, verbose_name='empenho para alteração de valor', on_delete=models.SET_NULL, null=True, blank=True, related_name='changes')
+    commitment_mode = models.CharField('modalidade do empenho', max_length=60, blank=True)
+    new_commitment_number = models.CharField('número do novo empenho', max_length=100, blank=True)
     justification = models.TextField('justificativa', blank=True)
 
     class Meta:
-        ordering = [models.F('request_date').desc(nulls_last=True), models.F('signed_date').desc(nulls_last=True)]
-        constraints = [
-            models.UniqueConstraint(fields=['contract', 'change_type', 'number'], name='unique_contract_change'),
-        ]
+        ordering = ['-request_date', 'number']
         verbose_name = 'Alteração contratual'
         verbose_name_plural = 'Alterações contratuais'
 
     def __str__(self):
-        return f'{self.get_change_type_display()} {self.number} — {self.contract.number}'
+        return f'{self.contract.number} — {self.number}'
 
 
 class AdministrativeProcess(TimeStampedModel):
     class Status(models.TextChoices):
-        PRELIMINARY = 'APURACAO', 'Em apuração'
-        DEFENSE = 'DEFESA', 'Aguardando defesa'
-        ANALYSIS = 'ANALISE', 'Em análise'
-        SANCTIONED = 'SANCIONADO', 'Sancionado'
-        ARCHIVED = 'ARQUIVADO', 'Arquivado'
+        OPEN = 'ABERTO', 'Aberto'
+        IN_PROGRESS = 'EM_ANDAMENTO', 'Em andamento'
+        SUSPENDED = 'SUSPENSO', 'Suspenso'
+        CLOSED = 'ENCERRADO', 'Encerrado'
 
     contract = models.ForeignKey(Contract, verbose_name='contrato', on_delete=models.CASCADE, related_name='administrative_processes')
-    number = models.CharField('número do PAAI/processo', max_length=120)
+    number = models.CharField('número do processo', max_length=100)
     reason = models.TextField('motivo')
     opened_date = models.DateField('data de abertura')
-    deadline = models.DateField('prazo/controle', null=True, blank=True)
-    status = models.CharField('situação', max_length=20, choices=Status.choices, default=Status.PRELIMINARY)
-    sanction = models.TextField('sanção/resultado', blank=True)
+    deadline = models.DateField('prazo', null=True, blank=True)
+    status = models.CharField('situação', max_length=20, choices=Status.choices, default=Status.OPEN)
+    sanction = models.TextField('sanção aplicada', blank=True)
     notes = models.TextField('observações', blank=True)
 
     class Meta:
         ordering = ['-opened_date']
-        constraints = [
-            models.UniqueConstraint(fields=['contract', 'number'], name='unique_administrative_process'),
-        ]
-        verbose_name = 'PAAI/Processo administrativo'
-        verbose_name_plural = 'PAAI/Processos administrativos'
+        verbose_name = 'Processo administrativo'
+        verbose_name_plural = 'Processos administrativos'
 
     def __str__(self):
-        return f'{self.number} — {self.contract.number}'
+        return f'{self.contract.number} — {self.number}'
 
 
 class Document(TimeStampedModel):
     class Category(models.TextChoices):
-        CONTRACT = 'CONTRATO', 'Contrato'
-        COMMITMENT = 'EMPENHO', 'Empenho'
-        SUPPLY_ORDER = 'OF', 'Ordem de fornecimento'
-        REPORT = 'RELATORIO', 'Relatório/Parecer'
-        NOTICE = 'NOTIFICACAO', 'Notificação'
-        ADDENDUM = 'ADITIVO', 'Aditivo/Apostilamento'
-        INVOICE = 'NF', 'Nota fiscal'
-        GUARANTEE = 'GARANTIA', 'Garantia'
-        OTHER = 'OUTRO', 'Outro'
+        LEGAL = 'LEGAL', 'Legal/Contratual'
+        FINANCIAL = 'FINANCIAL', 'Financeiro'
+        TECHNICAL = 'TECHNICAL', 'Técnico'
+        CORRESPONDENCE = 'CORRESPONDENCE', 'Correspondência'
+        DELIVERY = 'DELIVERY', 'Entrega/Recebimento'
+        OTHER = 'OTHER', 'Outro'
 
     contract = models.ForeignKey(Contract, verbose_name='contrato', on_delete=models.CASCADE, related_name='documents')
-    title = models.CharField('título', max_length=200)
-    category = models.CharField('categoria', max_length=20, choices=Category.choices, default=Category.OTHER)
-    file = models.FileField(
-        'arquivo',
-        upload_to='documents/%Y/%m/',
-        validators=[validate_document_extension, validate_file_size],
-    )
+    title = models.CharField('título', max_length=240)
+    category = models.CharField('categoria', max_length=30, choices=Category.choices, default=Category.OTHER)
+    file = models.FileField('arquivo', upload_to='contracts/documents/', validators=[validate_document_extension, validate_file_size])
     reference_date = models.DateField('data de referência', null=True, blank=True)
     description = models.TextField('descrição', blank=True)
-    uploaded_by = models.ForeignKey(
-        User,
-        verbose_name='enviado por',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='uploaded_documents',
-    )
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-reference_date', '-created_at']
         verbose_name = 'Documento'
         verbose_name_plural = 'Documentos'
 
     def __str__(self):
-        return self.title
+        return f'{self.contract.number} — {self.title}'
 
-    @property
-    def filename(self):
-        return Path(self.file.name).name
-
-
-class ImportBatch(TimeStampedModel):
-    class Status(models.TextChoices):
-        PREVIEW = 'PREVIA', 'Prévia gerada'
-        IMPORTED = 'IMPORTADO', 'Importado'
-        CANCELED = 'CANCELADO', 'Cancelado'
-        FAILED = 'FALHOU', 'Falhou'
-
-    filename = models.CharField('arquivo', max_length=255)
-    sheet_name = models.CharField('aba', max_length=100, default='Planilha1')
-    status = models.CharField('situação', max_length=20, choices=Status.choices, default=Status.PREVIEW)
-    created_by = models.ForeignKey(User, verbose_name='usuário', on_delete=models.SET_NULL, null=True, blank=True)
-    row_count = models.PositiveIntegerField('linhas lidas', default=0)
-    error_count = models.PositiveIntegerField('erros', default=0)
-    warning_count = models.PositiveIntegerField('alertas', default=0)
-    preview_data = models.JSONField('dados da prévia', default=dict, blank=True)
-    result = models.JSONField('resultado', default=dict, blank=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = 'Lote de importação'
-        verbose_name_plural = 'Lotes de importação'
-
-    def __str__(self):
-        return f'{self.filename} — {self.get_status_display()}'
-
-
-class AuditLog(models.Model):
-    class Action(models.TextChoices):
-        CREATE = 'CRIAR', 'Criação'
-        UPDATE = 'ALTERAR', 'Alteração'
-        DELETE = 'EXCLUIR', 'Exclusão'
-        IMPORT = 'IMPORTAR', 'Importação'
-        EXPORT = 'EXPORTAR', 'Exportação'
-        LOGIN = 'LOGIN', 'Acesso'
-
-    actor = models.ForeignKey(User, verbose_name='usuário', on_delete=models.SET_NULL, null=True, blank=True)
-    action = models.CharField('ação', max_length=15, choices=Action.choices)
-    model_name = models.CharField('módulo', max_length=100)
-    object_id = models.CharField('ID do registro', max_length=80, blank=True)
-    representation = models.CharField('registro', max_length=255)
-    changes = models.JSONField('alterações', default=dict, blank=True)
-    created_at = models.DateTimeField('data/hora', auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        indexes = [models.Index(fields=['-created_at', 'action'])]
-        verbose_name = 'Registro de auditoria'
-        verbose_name_plural = 'Registros de auditoria'
-
-    def __str__(self):
-        return f'{self.get_action_display()} — {self.representation}'
