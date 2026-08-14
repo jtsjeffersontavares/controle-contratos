@@ -21,6 +21,9 @@
 {% if contract_create_mode %}
   <script id="procurement-summary-url-template" type="application/json">"{{ procurement_summary_url_template|escapejs }}"</script>
 {% endif %}
+{% if procurement_item_data_url_template %}
+  <script id="procurement-item-data-url-template" type="application/json">"{{ procurement_item_data_url_template|escapejs }}"</script>
+{% endif %}
 <script>
 (() => {
   const currencyInputs = Array.from(document.querySelectorAll('input[data-currency="brl"]'));
@@ -301,6 +304,62 @@
     };
     procurementSelect?.addEventListener('change', updateFromProcurement);
     updateFromProcurement();
+  }
+
+  // Funcionalidade de preenchimento automático de item contratual baseado no item do pregão
+  const originItemSelectContractItem = document.getElementById('id_origin_procurement_item');
+  const codeInput = document.getElementById('id_code');
+  const nomenclatureInput = document.getElementById('id_nomenclature');
+  const descriptionInput = document.getElementById('id_description');
+  const unitValueInput = document.getElementById('id_unit_value');
+  const procurementItemDataTemplateRaw = document.getElementById('procurement-item-data-url-template');
+
+  if (originItemSelectContractItem && procurementItemDataTemplateRaw) {
+    const template = JSON.parse(procurementItemDataTemplateRaw.textContent || '""');
+
+    const fillContractItemFields = async () => {
+      const itemId = originItemSelectContractItem.value;
+      if (!itemId) {
+        // Limpar campos se nenhum item foi selecionado
+        if (codeInput) codeInput.value = '';
+        if (nomenclatureInput) nomenclatureInput.value = '';
+        if (descriptionInput) descriptionInput.value = '';
+        if (unitValueInput) unitValueInput.value = '';
+        return;
+      }
+
+      const url = template.replace('__id__', itemId);
+      try {
+        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('Falha ao carregar dados do item');
+        const data = await response.json();
+
+        // Preencher os campos automaticamente
+        if (codeInput) codeInput.value = data.code || '';
+        if (nomenclatureInput) nomenclatureInput.value = data.nomenclature || '';
+
+        // Preencher description com modelo e marca
+        if (descriptionInput) {
+          const modelText = data.model ? `Modelo: ${data.model}` : '';
+          const brandText = data.brand ? `Marca: ${data.brand}` : '';
+          const combined = [modelText, brandText].filter(Boolean).join(' | ');
+          descriptionInput.value = combined || '';
+        }
+
+        // Preencher unit_value
+        if (unitValueInput) {
+          unitValueInput.value = data.unitValue || '';
+          // Disparar evento blur para formatar a moeda
+          unitValueInput.dispatchEvent(new Event('blur'));
+        }
+      } catch (_error) {
+        // Se houver erro, apenas deixar os campos vazios
+        console.error('Erro ao carregar dados do item do pregão:', _error);
+      }
+    };
+
+    originItemSelectContractItem.addEventListener('change', fillContractItemFields);
+    fillContractItemFields();
   }
 })();
 </script>

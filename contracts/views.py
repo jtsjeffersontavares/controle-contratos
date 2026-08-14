@@ -465,6 +465,21 @@ class ProcurementItemDeleteView(LoginRequiredMixin, EditorRequiredMixin, DeleteV
         return super().form_valid(form)
 
 
+class ProcurementItemDataView(LoginRequiredMixin, View):
+    """API endpoint que retorna os dados de um item do pregão em JSON"""
+    def get(self, request, pk):
+        item = get_object_or_404(ProcurementItem, pk=pk)
+        return JsonResponse({
+            'id': item.pk,
+            'code': item.code or '',
+            'nomenclature': item.nomenclature or '',
+            'model': item.model or '',
+            'brand': item.brand or '',
+            'unit': item.unit or 'UN',
+            'unitValue': str(item.unit_value or '0'),
+        })
+
+
 class SupplierListView(SearchableListView):
     model = Supplier
     template_name = 'contracts/supplier_list.html'
@@ -602,11 +617,21 @@ class ItemCreateView(RelatedCreateView):
     form_class = ContractItemForm
     title = 'Novo item contratual'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['procurement_item_data_url_template'] = reverse('procurement_item_data', args=[0]).replace('/0/', '/__id__/')
+        return context
+
 
 class ItemUpdateView(RelatedUpdateView):
     model = ContractItem
     form_class = ContractItemForm
     title = 'Editar item contratual'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['procurement_item_data_url_template'] = reverse('procurement_item_data', args=[0]).replace('/0/', '/__id__/')
+        return context
 class CommitmentCreateView(RelatedCreateView): model = Commitment; form_class = CommitmentForm; title = 'Nova nota de empenho'
 class CommitmentUpdateView(RelatedUpdateView): model = Commitment; form_class = CommitmentForm; title = 'Editar nota de empenho'
 class SupplyOrderCreateView(RelatedCreateView):

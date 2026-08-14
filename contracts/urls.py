@@ -16,6 +16,7 @@ urlpatterns = [
     path('pregoes/itens/novo/', views.ProcurementItemCreateView.as_view(), name='procurement_item_create'),
     path('pregoes/itens/<int:pk>/editar/', views.ProcurementItemUpdateView.as_view(), name='procurement_item_update'),
     path('pregoes/itens/<int:pk>/excluir/', views.ProcurementItemDeleteView.as_view(), name='procurement_item_delete'),
+    path('pregoes/itens/<int:pk>/dados/', views.ProcurementItemDataView.as_view(), name='procurement_item_data'),
 
     path('contratos/', views.ContractListView.as_view(), name='contract_list'),
     path('contratos/novo/', views.ContractCreateView.as_view(), name='contract_create'),
