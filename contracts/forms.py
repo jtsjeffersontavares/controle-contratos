@@ -166,8 +166,13 @@ class ProcurementForm(StyledModelForm):
 class ProcurementItemForm(StyledModelForm):
     class Meta:
         model = ProcurementItem
-        fields = ['procurement', 'item_number', 'code', 'nomenclature', 'model', 'brand', 'quantity', 'unit', 'unit_value']
+        fields = ['procurement', 'supplier', 'item_number', 'code', 'nomenclature', 'model', 'brand', 'quantity', 'unit', 'unit_value']
         widgets = {'model': TEXTAREA_WIDGET, 'brand': TEXTAREA_WIDGET}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['supplier'].help_text = 'Selecione a empresa responsável por este item do pregão. Cada contrato é individual, então mesmo que seja o mesmo pregão e a mesma empresa, os itens podem variar.'
+        self.fields['supplier'].queryset = Supplier.objects.filter(active=True).order_by('name')
 
 
 ProcurementItemDeliveryFormSet = forms.inlineformset_factory(
@@ -454,3 +459,4 @@ class ImportWorkbookForm(forms.Form):
         if file.size > 12 * 1024 * 1024:
             raise forms.ValidationError('O arquivo excede 12 MB.')
         return file
+
