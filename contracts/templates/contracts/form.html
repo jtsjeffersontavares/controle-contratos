@@ -105,9 +105,9 @@
   const toggleChangeFields = () => {
     const type = changeTypeSelect ? changeTypeSelect.value : '';
     const sections = {
-      QUANTIDADE: ['item', 'old_quantity', 'new_quantity'],
-      PRAZO: ['deadline_scope', 'old_end_date', 'new_end_date'],
-      VALOR: ['value_change', 'commitment', 'commitment_mode', 'new_commitment_number'],
+      'QUANTIDADE': ['item', 'old_quantity', 'new_quantity'],
+      'PRAZO': ['deadline_scope', 'old_end_date', 'new_end_date'],
+      'VALOR': ['value_change', 'commitment', 'commitment_mode', 'new_commitment_number'],
     };
     const alwaysVisible = new Set(['contract', 'change_type', 'number', 'justification']);
 
@@ -116,24 +116,30 @@
       const input = field.querySelector('input, select, textarea');
       if (!input) return;
       const fieldName = input.name || '';
-      const shouldShow = alwaysVisible.has(fieldName) || (type && sections[type].includes(fieldName));
+      
+      // Verifica se deve mostrar o campo
+      const isAlwaysVisible = alwaysVisible.has(fieldName);
+      const isInCurrentSection = type && sections[type] && sections[type].includes(fieldName);
+      const shouldShow = isAlwaysVisible || isInCurrentSection;
+      
+      // Altera a visibilidade da div wrapper
       field.style.display = shouldShow ? '' : 'none';
-    });
-
-    if (changeTypeSelect && oldQuantityInput && itemSelect) {
-      const selectedItemId = itemSelect.value;
-      if (type === 'QUANTIDADE' && selectedItemId) {
-        const selectedOption = itemSelect.options[itemSelect.selectedIndex];
-        const match = selectedOption && selectedOption.textContent.match(/Qtd atual:\s*([0-9.,]+)/);
-        if (match && oldQuantityInput) {
-          oldQuantityInput.value = match[1].replace('.', '').replace(',', '.');
-        }
+      
+      // Também altera a visibilidade do input (importante se houver CSS inline)
+      if (shouldShow) {
+        input.style.display = '';
+        input.removeAttribute('disabled');
+      } else {
+        input.style.display = 'none';
       }
-    }
+    });
   };
 
+  // Executar toggleChangeFields depois que todo o DOM estiver pronto
   if (changeTypeSelect) {
     changeTypeSelect.addEventListener('change', toggleChangeFields);
+    // Executar uma vez no carregamento
+    setTimeout(toggleChangeFields, 0);
   }
   if (itemSelect) {
     itemSelect.addEventListener('change', () => {
@@ -145,7 +151,13 @@
       toggleChangeFields();
     });
   }
-  toggleChangeFields();
+  
+  // Executar toggleChangeFields quando o script terminar de carregar
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', toggleChangeFields);
+  } else {
+    toggleChangeFields();
+  }
   if (itemSelect) {
     const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
     const defaultText = destinationHelp ? (destinationHelp.textContent || '') : '';

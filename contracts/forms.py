@@ -335,18 +335,21 @@ class ContractChangeForm(StyledModelForm):
 
     def _apply_field_visibility(self):
         change_type = self.data.get(self.add_prefix('change_type')) or getattr(self.instance, 'change_type', '')
-        for field_name in ['contract', 'change_type', 'number', 'signed_date', 'item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date', 'value_change', 'commitment', 'commitment_mode', 'new_commitment_number', 'status', 'justification']:
+        
+        # Apenas remova qualquer estilo anterior
+        for field_name in list(self.fields.keys()):
             field = self.fields.get(field_name)
-            if field is None:
-                continue
-            field.widget.attrs.pop('style', None)
+            if field:
+                field.widget.attrs.pop('style', None)
 
-        for field_name in ['item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date', 'value_change', 'commitment', 'commitment_mode', 'new_commitment_number']:
+        # Não defina display: none aqui - deixe o JavaScript controlar isso
+        # Campos dinâmicos começarão como opcionais
+        dynamic_fields = ['item', 'old_quantity', 'new_quantity', 'deadline_scope', 'old_end_date', 'new_end_date', 'value_change', 'commitment', 'commitment_mode', 'new_commitment_number']
+        for field_name in dynamic_fields:
             field = self.fields.get(field_name)
             if field is None:
                 continue
             field.required = False
-            field.widget.attrs['style'] = 'display: none;'
 
         if change_type == ContractChange.ChangeType.QUANTITY:
             for field_name in ['item', 'old_quantity', 'new_quantity']:
