@@ -143,7 +143,10 @@
   }
   if (itemSelect) {
     itemSelect.addEventListener('change', () => {
-      toggleChangeFields();
+      // Apenas chamar toggleChangeFields se for um formulário de alteração contratual
+      if (changeTypeSelect) {
+        toggleChangeFields();
+      }
       refreshDestinationHelp(); // Agora também atualiza a quantidade
     });
   }
