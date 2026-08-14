@@ -149,10 +149,13 @@
   }
   
   // Executar toggleChangeFields quando o script terminar de carregar
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', toggleChangeFields);
-  } else {
-    toggleChangeFields();
+  // APENAS se estivermos em um formulário de alteração contratual
+  if (changeTypeSelect) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', toggleChangeFields);
+    } else {
+      toggleChangeFields();
+    }
   }
   if (itemSelect) {
     const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
