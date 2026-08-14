@@ -143,12 +143,8 @@
   }
   if (itemSelect) {
     itemSelect.addEventListener('change', () => {
-      const selectedOption = itemSelect.options[itemSelect.selectedIndex];
-      const match = selectedOption && selectedOption.textContent.match(/Qtd atual:\s*([0-9.,]+)/);
-      if (match && oldQuantityInput) {
-        oldQuantityInput.value = match[1].replace('.', '').replace(',', '.');
-      }
       toggleChangeFields();
+      refreshDestinationHelp(); // Agora também atualiza a quantidade
     });
   }
   
@@ -160,7 +156,18 @@
   }
   if (itemSelect) {
     const itemLocationsMap = itemLocationsRaw ? JSON.parse(itemLocationsRaw.textContent || '{}') : {};
+    const itemQuantitiesMap = {}; // Novo: armazenar quantidade do pregão
     const defaultText = destinationHelp ? (destinationHelp.textContent || '') : '';
+    
+    // Função auxiliar para atualizar o campo de quantidade do pregão
+    const updateProcurementQuantity = () => {
+      const selectedItemId = itemSelect.value;
+      const procurementQty = itemQuantitiesMap[selectedItemId];
+      if (procurementQty && oldQuantityInput) {
+        oldQuantityInput.value = String(procurementQty).replace('.', '').replace(',', '.');
+      }
+    };
+    
     const refreshDestinationHelp = () => {
       const selected = itemSelect.value;
       const refs = itemLocationsMap[selected] || '';
@@ -172,6 +179,7 @@
       if (procurementDestinationsField) {
         procurementDestinationsField.value = refs || '';
       }
+      updateProcurementQuantity(); // Atualizar quantidade do pregão
     };
 
     const orderItemsTemplateRaw = document.getElementById('order-items-url-template');
@@ -185,6 +193,7 @@
         placeholder.textContent = '---------';
         itemSelect.appendChild(placeholder);
         const newMap = {};
+        const newQuantitiesMap = {};
         for (const item of items) {
           const option = document.createElement('option');
           option.value = String(item.id);
@@ -194,9 +203,12 @@
           }
           itemSelect.appendChild(option);
           newMap[String(item.id)] = item.locationsText || '';
+          newQuantitiesMap[String(item.id)] = item.procurementItemQuantity || ''; // Armazenar quantidade do pregão
         }
         Object.keys(itemLocationsMap).forEach((key) => delete itemLocationsMap[key]);
         Object.assign(itemLocationsMap, newMap);
+        Object.keys(itemQuantitiesMap).forEach((key) => delete itemQuantitiesMap[key]);
+        Object.assign(itemQuantitiesMap, newQuantitiesMap);
       };
 
       const loadItemsByContract = async () => {

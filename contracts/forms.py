@@ -317,15 +317,16 @@ class ContractChangeForm(StyledModelForm):
             f'(Qtd atual: {item.quantity})'
         )
         self.fields['commitment'].queryset = self._get_commitment_queryset()
+        self.fields['old_quantity'].label = 'Quantidade do pregão'
         self.fields['old_quantity'].widget.attrs['readonly'] = 'readonly'
-        self.fields['old_quantity'].help_text = 'Quantidade atual do item selecionado.'
+        self.fields['old_quantity'].help_text = 'Quantidade original do item no pregão.'
         self._apply_field_visibility()
 
     def _get_contract_items_queryset(self):
         contract_id = (self.data.get(self.add_prefix('contract')) if self.data else None) or getattr(self.instance, 'contract_id', None) or self.initial.get('contract')
         if not contract_id:
             return ContractItem.objects.none()
-        return ContractItem.objects.filter(contract_id=contract_id).order_by('procurement_item', 'code')
+        return ContractItem.objects.filter(contract_id=contract_id).select_related('origin_procurement_item').order_by('procurement_item', 'code')
 
     def _get_commitment_queryset(self):
         contract_id = (self.data.get(self.add_prefix('contract')) if self.data else None) or getattr(self.instance, 'contract_id', None) or self.initial.get('contract')
@@ -355,14 +356,20 @@ class ContractChangeForm(StyledModelForm):
             for field_name in ['item', 'old_quantity', 'new_quantity']:
                 self.fields[field_name].widget.attrs.pop('style', None)
                 self.fields[field_name].required = True
-            self.fields['old_quantity'].help_text = 'Quantidade atual do item selecionado.'
+            self.fields['old_quantity'].help_text = 'Quantidade original do item no pregão.'
             self.fields['new_quantity'].help_text = 'Informe a nova quantidade.'
             if self.instance.pk and self.instance.item_id:
-                self.initial['old_quantity'] = self.instance.item.quantity
+                if self.instance.item.origin_procurement_item:
+                    self.initial['old_quantity'] = self.instance.item.origin_procurement_item.quantity
+                else:
+                    self.initial['old_quantity'] = self.instance.item.quantity
             elif self.data.get(self.add_prefix('item')):
-                selected_item = ContractItem.objects.filter(pk=self.data.get(self.add_prefix('item'))).first()
+                selected_item = ContractItem.objects.filter(pk=self.data.get(self.add_prefix('item'))).select_related('origin_procurement_item').first()
                 if selected_item:
-                    self.initial['old_quantity'] = selected_item.quantity
+                    if selected_item.origin_procurement_item:
+                        self.initial['old_quantity'] = selected_item.origin_procurement_item.quantity
+                    else:
+                        self.initial['old_quantity'] = selected_item.quantity
         elif change_type == ContractChange.ChangeType.DEADLINE:
             for field_name in ['deadline_scope', 'old_end_date', 'new_end_date']:
                 self.fields[field_name].widget.attrs.pop('style', None)

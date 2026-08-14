@@ -371,7 +371,9 @@ class ContractOrderItemsView(LoginRequiredMixin, View):
         queryset = contract.items.select_related('origin_procurement_item').all()
         for item in queryset:
             locations = []
+            procurement_item_quantity = None
             if item.origin_procurement_item_id:
+                procurement_item_quantity = item.origin_procurement_item.quantity
                 locations = list(
                     item.origin_procurement_item.delivery_locations.select_related('destination').values_list(
                         'destination__acronym', 'quantity'
@@ -385,6 +387,7 @@ class ContractOrderItemsView(LoginRequiredMixin, View):
                 'label': label,
                 'procurementItem': item.procurement_item or '',
                 'locationsText': refs,
+                'procurementItemQuantity': str(procurement_item_quantity) if procurement_item_quantity else None,
             })
         return JsonResponse({'contractId': contract.pk, 'items': items})
 
