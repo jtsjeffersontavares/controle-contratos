@@ -61,7 +61,7 @@ class ContractForm(StyledModelForm):
             'procurement',
             'process_number', 'subprocess_number', 'law', 'status',
             'signature_date', 'start_date', 'end_date',
-            'initial_value', 'current_value', 'notes',
+            'notes',
         ]
         widgets = {
             'notes': TEXTAREA_WIDGET,
