@@ -9,7 +9,6 @@ from decimal import Decimal, InvalidOperation
 from django.db import transaction
 
 from .models import (
-    AuditLog,
     Commitment,
     Contract,
     ContractItem,
@@ -541,11 +540,4 @@ def import_preview(preview: dict, actor=None, filename='planilha.xlsx') -> dict:
 
     result = dict(counters)
     result['rows_processed'] = len(rows)
-    AuditLog.objects.create(
-        actor=actor if getattr(actor, 'is_authenticated', False) else None,
-        action=AuditLog.Action.IMPORT,
-        model_name='Importação de planilha',
-        representation=filename,
-        changes=result,
-    )
     return result
