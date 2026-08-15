@@ -62,7 +62,6 @@ urlpatterns = [
     path('documentos/novo/', views.DocumentCreateView.as_view(), name='document_create'),
     path('documentos/<int:pk>/editar/', views.DocumentUpdateView.as_view(), name='document_update'),
     path('documentos/<int:pk>/excluir/', views.DocumentDeleteView.as_view(), name='document_delete'),
-    path('auditoria/', views.AuditListView.as_view(), name='audit_list'),
 
     path('importar/', views.ImportUploadView.as_view(), name='import_upload'),
     path('importar/modelo/', views.DownloadImportTemplateView.as_view(), name='import_template'),

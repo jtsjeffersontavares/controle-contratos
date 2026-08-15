@@ -43,8 +43,4 @@
     </tbody></table></div>
   </section>
 </div>
-<section class="panel">
-  <div class="panel-heading"><h2>Atividade recente</h2>{% if can_manage %}<a href="{% url 'audit_list' %}">Auditoria completa</a>{% endif %}</div>
-  <div class="timeline">{% for log in recent_audit %}<div><span class="timeline-dot"></span><p><strong>{{ log.get_action_display }}</strong> — {{ log.representation }}<small>{{ log.actor|default:'Sistema' }} · {{ log.created_at|date:'d/m/Y H:i' }}</small></p></div>{% empty %}<p class="empty">Sem movimentações.</p>{% endfor %}</div>
-</section>
 {% endblock %}

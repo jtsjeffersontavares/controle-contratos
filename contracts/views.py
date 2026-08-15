@@ -42,7 +42,6 @@ from .forms import (
 from .import_service import import_preview, preview_workbook
 from .models import (
     AdministrativeProcess,
-    AuditLog,
     Commitment,
     Contract,
     ContractChange,
@@ -109,7 +108,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'top_destinations': top_destinations,
             'upcoming_contracts': upcoming,
             'overdue_orders': overdue_orders,
-            'recent_audit': AuditLog.objects.select_related('actor')[:8],
             'status_cards': [
                 {'label': 'Vigentes', 'value': status_counts[Contract.Status.ACTIVE], 'class': 'success'},
                 {'label': 'Vencendo em 90 dias', 'value': status_counts[Contract.Status.EXPIRING], 'class': 'warning'},
@@ -561,16 +559,6 @@ class DocumentListView(SearchableListView):
         return super().get_queryset().select_related('contract', 'uploaded_by')
 
 
-class AuditListView(SearchableListView):
-    model = AuditLog
-    template_name = 'contracts/audit_list.html'
-    context_object_name = 'logs'
-    search_fields = ['actor__username', 'representation', 'model_name', 'action']
-
-    def get_queryset(self):
-        return super().get_queryset().select_related('actor')
-
-
 # CRUDs auxiliares
 class SupplierCreateView(LoginRequiredMixin, EditorRequiredMixin, FormMetaMixin, CreateView):
     model = Supplier; form_class = SupplierForm; template_name = 'contracts/form.html'; title = 'Nova empresa'; success_url = reverse_lazy('supplier_list')
@@ -834,7 +822,6 @@ class ExportContractsCsvView(LoginRequiredMixin, View):
         writer.writerow(REPORT_HEADERS)
         for row in _contract_report_rows():
             writer.writerow(row)
-        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Contratos', representation='Relatório CSV')
         return response
 
 
@@ -843,7 +830,6 @@ class ExportContractsXlsxView(LoginRequiredMixin, View):
         content = write_simple_xlsx(REPORT_HEADERS, _contract_report_rows(), 'Contratos')
         response = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = 'attachment; filename="contratos_sdap.xlsx"'
-        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Contratos', representation='Relatório XLSX')
         return response
 
 
@@ -909,7 +895,6 @@ class ExportContractsPdfView(LoginRequiredMixin, View):
         document.build(elements)
         response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="contratos_sdap.pdf"'
-        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Contratos', representation='Relatório PDF')
         return response
 
 
@@ -922,7 +907,6 @@ class ExportProcurementsCsvView(LoginRequiredMixin, View):
         writer.writerow(PROCUREMENT_REPORT_HEADERS)
         for row in _procurement_report_rows():
             writer.writerow(row)
-        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Pregões', representation='Relatório CSV')
         return response
 
 
@@ -931,7 +915,6 @@ class ExportProcurementsXlsxView(LoginRequiredMixin, View):
         content = write_simple_xlsx(PROCUREMENT_REPORT_HEADERS, _procurement_report_rows(), 'Pregoes')
         response = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = 'attachment; filename="pregoes_sdap.xlsx"'
-        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Pregões', representation='Relatório XLSX')
         return response
 
 
@@ -981,7 +964,6 @@ class ExportProcurementsPdfView(LoginRequiredMixin, View):
         document.build(elements)
         response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="pregoes_sdap.pdf"'
-        AuditLog.objects.create(actor=request.user, action=AuditLog.Action.EXPORT, model_name='Pregões', representation='Relatório PDF')
         return response
 
 
