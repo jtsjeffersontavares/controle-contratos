@@ -99,7 +99,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'expiring_contracts': status_counts[Contract.Status.EXPIRING],
             'expired_contracts': status_counts[Contract.Status.EXPIRED],
             'closed_contracts': status_counts[Contract.Status.CLOSED],
-            'open_paai': AdministrativeProcess.objects.exclude(status=AdministrativeProcess.Status.ARCHIVED).count(),
+            'open_paai': AdministrativeProcess.objects.exclude(status=AdministrativeProcess.Status.CLOSED).count(),
             'overdue_orders_count': order_status_counts[SupplyOrder.Status.OVERDUE],
             'delivery_percent': min(Decimal('100'), delivery_percent),
             'top_destinations': top_destinations,
