@@ -30,7 +30,6 @@ from .forms import (
     ContractItemForm,
     DeliveryForm,
     DocumentForm,
-    ImportWorkbookForm,
     OrganizationForm,
     PersonForm,
     ProcurementForm,
@@ -39,7 +38,6 @@ from .forms import (
     SupplierForm,
     SupplyOrderForm,
 )
-from .import_service import import_preview, preview_workbook
 from .models import (
     AdministrativeProcess,
     Commitment,
@@ -48,7 +46,6 @@ from .models import (
     ContractItem,
     Delivery,
     Document,
-    ImportBatch,
     Organization,
     Person,
     Procurement,
@@ -694,76 +691,6 @@ class DeliveryDeleteView(RelatedDeleteView): model = Delivery
 class ChangeDeleteView(RelatedDeleteView): model = ContractChange
 class ProcessDeleteView(RelatedDeleteView): model = AdministrativeProcess
 class DocumentDeleteView(RelatedDeleteView): model = Document
-
-
-class ImportUploadView(LoginRequiredMixin, ManagerRequiredMixin, View):
-    template_name = 'contracts/import_upload.html'
-
-    def get(self, request):
-        return render(request, self.template_name, {'form': ImportWorkbookForm()})
-
-    def post(self, request):
-        form = ImportWorkbookForm(request.POST, request.FILES)
-        if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
-        file = form.cleaned_data['file']
-        sheet_name = form.cleaned_data['sheet_name']
-        try:
-            preview = preview_workbook(file, sheet_name)
-        except (ValueError, OSError) as exc:
-            form.add_error('file', str(exc))
-            return render(request, self.template_name, {'form': form})
-        batch = ImportBatch.objects.create(
-            filename=file.name,
-            sheet_name=sheet_name,
-            created_by=request.user,
-            row_count=preview['summary']['rows'],
-            error_count=preview['summary']['errors'],
-            warning_count=preview['summary']['warnings'],
-            preview_data=preview,
-        )
-        return redirect('import_preview', pk=batch.pk)
-
-
-class ImportPreviewView(LoginRequiredMixin, ManagerRequiredMixin, View):
-    template_name = 'contracts/import_preview.html'
-
-    def get_batch(self, pk):
-        batch = get_object_or_404(ImportBatch, pk=pk)
-        if batch.status != ImportBatch.Status.PREVIEW:
-            raise Http404('Este lote não está mais disponível para confirmação.')
-        return batch
-
-    def get(self, request, pk):
-        batch = self.get_batch(pk)
-        return render(request, self.template_name, {'batch': batch, 'preview': batch.preview_data})
-
-    def post(self, request, pk):
-        batch = self.get_batch(pk)
-        if batch.error_count:
-            messages.error(request, 'A importação não pode ser confirmada enquanto houver erros impeditivos.')
-            return redirect('import_preview', pk=batch.pk)
-        try:
-            result = import_preview(batch.preview_data, actor=request.user, filename=batch.filename)
-        except ValueError as exc:
-            messages.error(request, str(exc))
-            return redirect('import_preview', pk=batch.pk)
-        batch.status = ImportBatch.Status.IMPORTED
-        batch.result = result
-        batch.preview_data = {}
-        batch.save(update_fields=['status', 'result', 'preview_data', 'updated_at'])
-        messages.success(request, 'Planilha importada com sucesso.')
-        return render(request, 'contracts/import_result.html', {'batch': batch, 'result': result})
-
-
-class ImportCancelView(LoginRequiredMixin, ManagerRequiredMixin, View):
-    def post(self, request, pk):
-        batch = get_object_or_404(ImportBatch, pk=pk, status=ImportBatch.Status.PREVIEW)
-        batch.status = ImportBatch.Status.CANCELED
-        batch.preview_data = {}
-        batch.save(update_fields=['status', 'preview_data', 'updated_at'])
-        messages.info(request, 'Importação cancelada sem gravar dados.')
-        return redirect('dashboard')
 
 
 def _contract_report_rows():

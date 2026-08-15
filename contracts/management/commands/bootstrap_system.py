@@ -18,7 +18,7 @@ class Command(BaseCommand):
         app_permissions = Permission.objects.filter(content_type__app_label='contracts')
         view_permissions = app_permissions.filter(codename__startswith='view_')
         groups['Administrador'].permissions.set(app_permissions)
-        groups['Gestor'].permissions.set(app_permissions.exclude(codename__in=['delete_auditlog']))
+        groups['Gestor'].permissions.set(app_permissions)
 
         fiscal_codenames = [
             'view_contract', 'view_contractitem', 'view_commitment', 'view_supplyorder', 'view_delivery',

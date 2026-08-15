@@ -63,11 +63,6 @@ urlpatterns = [
     path('documentos/<int:pk>/editar/', views.DocumentUpdateView.as_view(), name='document_update'),
     path('documentos/<int:pk>/excluir/', views.DocumentDeleteView.as_view(), name='document_delete'),
 
-    path('importar/', views.ImportUploadView.as_view(), name='import_upload'),
-    path('importar/modelo/', views.DownloadImportTemplateView.as_view(), name='import_template'),
-    path('importar/<int:pk>/previa/', views.ImportPreviewView.as_view(), name='import_preview'),
-    path('importar/<int:pk>/cancelar/', views.ImportCancelView.as_view(), name='import_cancel'),
-
     path('relatorios/contratos.csv', views.ExportContractsCsvView.as_view(), name='export_contracts_csv'),
     path('relatorios/contratos.xlsx', views.ExportContractsXlsxView.as_view(), name='export_contracts_xlsx'),
     path('relatorios/contratos.pdf', views.ExportContractsPdfView.as_view(), name='export_contracts_pdf'),

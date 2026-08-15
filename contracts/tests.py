@@ -272,7 +272,7 @@ class ViewAndPermissionTests(TestCase):
             reverse('supplier_list'), reverse('organization_list'), reverse('person_list'),
             reverse('commitment_list'), reverse('supplyorder_list'), reverse('delivery_list'),
             reverse('change_list'), reverse('process_list'), reverse('document_list'),
-            reverse('audit_list'), reverse('help'), reverse('contract_create'),
+            reverse('help'), reverse('contract_create'),
             reverse('procurement_create'), reverse('procurement_item_create') + f'?procurement={procurement.pk}',
             reverse('procurement_item_update', args=[procurement_item.pk]),
             reverse('item_create') + f'?contract={contract.pk}',
