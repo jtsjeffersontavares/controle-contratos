@@ -2,12 +2,14 @@ from django.contrib import admin
 
 from .models import (
     AdministrativeProcess,
+    AuditLog,
     Commitment,
     Contract,
     ContractChange,
     ContractItem,
     Delivery,
     Document,
+    ImportBatch,
     Organization,
     Person,
     Procurement,
@@ -90,8 +92,22 @@ class DeliveryAdmin(admin.ModelAdmin):
     list_filter = ('acceptance', 'delivery_date')
 
 
-for model in [ContractChange, AdministrativeProcess, Document]:
+for model in [ContractChange, AdministrativeProcess, Document, ImportBatch]:
     admin.site.register(model)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'actor', 'action', 'model_name', 'representation')
+    list_filter = ('action', 'model_name', 'created_at')
+    search_fields = ('representation', 'actor__username')
+    readonly_fields = ('actor', 'action', 'model_name', 'object_id', 'representation', 'changes', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(ProcurementItemDelivery)

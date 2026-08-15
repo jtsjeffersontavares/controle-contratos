@@ -37,6 +37,8 @@
         <a href="{% url 'person_list' %}">Responsáveis</a>
         {% if can_manage %}
           <span class="nav-label">Administração</span>
+          <a href="{% url 'import_upload' %}">Importar planilha</a>
+          <a href="{% url 'audit_list' %}">Auditoria</a>
         {% endif %}
         {% if request.user.is_staff %}<a href="{% url 'admin:index' %}">Usuários e permissões</a>{% endif %}
         <a href="{% url 'help' %}">Ajuda</a>

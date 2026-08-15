@@ -655,6 +655,59 @@ class AdministrativeProcess(TimeStampedModel):
         return f'{self.contract.number} — {self.number}'
 
 
+class ImportBatch(TimeStampedModel):
+    class Status(models.TextChoices):
+        PREVIEW = 'PREVIA', 'Prévia gerada'
+        IMPORTED = 'IMPORTADO', 'Importado'
+        CANCELED = 'CANCELADO', 'Cancelado'
+        FAILED = 'FALHOU', 'Falhou'
+
+    filename = models.CharField('arquivo', max_length=255)
+    sheet_name = models.CharField('aba', max_length=100, default='Planilha1')
+    status = models.CharField('situação', max_length=20, choices=Status.choices, default=Status.PREVIEW)
+    created_by = models.ForeignKey(User, verbose_name='usuário', on_delete=models.SET_NULL, null=True, blank=True)
+    row_count = models.PositiveIntegerField('linhas lidas', default=0)
+    error_count = models.PositiveIntegerField('erros', default=0)
+    warning_count = models.PositiveIntegerField('alertas', default=0)
+    preview_data = models.JSONField('dados da prévia', default=dict, blank=True)
+    result = models.JSONField('resultado', default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Lote de importação'
+        verbose_name_plural = 'Lotes de importação'
+
+    def __str__(self):
+        return f'{self.filename} — {self.get_status_display()}'
+
+
+class AuditLog(models.Model):
+    class Action(models.TextChoices):
+        CREATE = 'CRIAR', 'Criação'
+        UPDATE = 'ALTERAR', 'Alteração'
+        DELETE = 'EXCLUIR', 'Exclusão'
+        IMPORT = 'IMPORTAR', 'Importação'
+        EXPORT = 'EXPORTAR', 'Exportação'
+        LOGIN = 'LOGIN', 'Acesso'
+
+    actor = models.ForeignKey(User, verbose_name='usuário', on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField('ação', max_length=15, choices=Action.choices)
+    model_name = models.CharField('módulo', max_length=100)
+    object_id = models.CharField('ID do registro', max_length=80, blank=True)
+    representation = models.CharField('registro', max_length=255)
+    changes = models.JSONField('alterações', default=dict, blank=True)
+    created_at = models.DateTimeField('data/hora', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['-created_at', 'action'])]
+        verbose_name = 'Registro de auditoria'
+        verbose_name_plural = 'Registros de auditoria'
+
+    def __str__(self):
+        return f'{self.get_action_display()} — {self.representation}'
+
+
 class Document(TimeStampedModel):
     class Category(models.TextChoices):
         LEGAL = 'LEGAL', 'Legal/Contratual'

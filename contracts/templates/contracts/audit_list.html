@@ -1,0 +1,11 @@
+{% extends 'contracts/base.html' %}{% load contracts_extras %}
+{% block content %}
+<div class="page-heading"><div><h1>Trilha de auditoria</h1><p>Registros de criação, alteração, exclusão e acesso ao sistema.</p></div></div>
+<div class="toolbar">
+  <form method="get" class="search-form"><input name="q" value="{{ q }}" placeholder="Usuário, ação, módulo, registro..."><button class="button" type="submit">Pesquisar</button></form>
+</div>
+<div class="panel table-wrap"><table><thead><tr><th>Data/hora</th><th>Usuário</th><th>Ação</th><th>Módulo</th><th>Registro</th></tr></thead><tbody>
+{% for log in logs %}<tr><td>{{ log.created_at|date:'d/m/Y H:i:s' }}</td><td>{% if log.actor %}{{ log.actor.get_full_name|default:log.actor.username }}{% else %}Sistema{% endif %}</td><td><span class="badge">{{ log.get_action_display }}</span></td><td>{{ log.model_name }}</td><td>{{ log.representation }}</td></tr>
+{% empty %}<tr><td colspan="5" class="empty">Nenhum registro de auditoria encontrado.</td></tr>{% endfor %}
+</tbody></table></div>{% include 'contracts/pagination.html' %}
+{% endblock %}

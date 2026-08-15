@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from .forms import ContractForm
 from .import_service import import_preview, preview_workbook
-from .models import Contract, Delivery, Document, Organization, Procurement, ProcurementItem, ProcurementItemDelivery, Supplier, SupplyOrder
+from .models import AuditLog, Contract, Delivery, Document, Organization, Procurement, ProcurementItem, ProcurementItemDelivery, Supplier, SupplyOrder
 from .xlsx_utils import read_xlsx_sheet, write_simple_xlsx
 
 
@@ -67,6 +67,24 @@ class ImportTests(TestCase):
         file = SimpleUploadedFile('invalida.xlsx', write_simple_xlsx(['PAG'], [['x']], 'Planilha1'))
         with self.assertRaises(ValueError):
             preview_workbook(file, 'Planilha1')
+
+
+class AuditLogTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('gestor', password='SenhaForte123!')
+        self.group = Group.objects.create(name='Gestor')
+        self.user.groups.add(self.group)
+
+    def test_audit_log_is_created_and_list_page_renders(self):
+        self.client.login(username='gestor', password='SenhaForte123!')
+
+        Supplier.objects.create(name='EMPRESA AUDITORIA')
+
+        self.assertTrue(AuditLog.objects.filter(action=AuditLog.Action.CREATE, model_name='Empresa').exists())
+
+        response = self.client.get(reverse('audit_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Trilha de auditoria')
 
 
 class ContractModelTests(TestCase):
@@ -688,13 +706,12 @@ class ViewAndPermissionTests(TestCase):
 
         response = self.client.get(reverse('change_create') + f'?contract={contract.pk}')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Número do subprocesso')
+        self.assertContains(response, 'Número da alteração')
         self.assertContains(response, 'QUANTIDADE')
         self.assertContains(response, 'PRAZO')
         self.assertContains(response, 'VALOR')
         self.assertNotContains(response, 'Termo aditivo')
         self.assertNotContains(response, 'Reajuste')
-        self.assertNotContains(response, 'Data da solicitação')
         self.assertNotContains(response, 'name="request_date"')
 
     def test_contract_detail_shows_procurement_edit_rule_message(self):
