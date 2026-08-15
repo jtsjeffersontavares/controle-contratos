@@ -1,0 +1,10 @@
+# Bandit security configuration
+exclude_dirs:
+  - tests
+  - migrations
+  - .venv
+  - venv
+
+skips:
+  - B308  # Mark the suspicious mark_safe use (Django)
+  - B101  # Assert used for testing
