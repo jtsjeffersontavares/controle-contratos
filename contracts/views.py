@@ -4,30 +4,22 @@ import csv
 import io
 import mimetypes
 import re
-from pathlib import Path
-from datetime import timedelta
 from collections import Counter
+from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.forms.utils import ErrorList
 from django.db.models import Q, Sum
-from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponse
-from django.http import JsonResponse
+from django.forms.utils import ErrorList
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
-from django.views.generic import (
-    CreateView,
-    DeleteView,
-    DetailView,
-    ListView,
-    TemplateView,
-    UpdateView,
-)
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from .forms import (
     AdministrativeProcessForm,
@@ -1269,13 +1261,7 @@ class ExportContractsPdfView(LoginRequiredMixin, View):
             from reportlab.lib.pagesizes import A4, landscape
             from reportlab.lib.styles import getSampleStyleSheet
             from reportlab.lib.units import mm
-            from reportlab.platypus import (
-                Paragraph,
-                SimpleDocTemplate,
-                Spacer,
-                Table,
-                TableStyle,
-            )
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
         except ImportError as exc:
             raise RuntimeError("A dependência reportlab não está instalada.") from exc
         buffer = io.BytesIO()
@@ -1393,13 +1379,7 @@ class ExportProcurementsPdfView(LoginRequiredMixin, View):
             from reportlab.lib.pagesizes import A4, landscape
             from reportlab.lib.styles import getSampleStyleSheet
             from reportlab.lib.units import mm
-            from reportlab.platypus import (
-                Paragraph,
-                SimpleDocTemplate,
-                Spacer,
-                Table,
-                TableStyle,
-            )
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
         except ImportError as exc:
             raise RuntimeError("A dependência reportlab não está instalada.") from exc
 

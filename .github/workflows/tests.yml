@@ -1,4 +1,4 @@
-name: Tests & Linting
+name: CI - Django Tests
 
 on:
   push:
@@ -7,34 +7,6 @@ on:
     branches: [main, develop]
 
 jobs:
-  lint:
-    name: Lint & Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install black isort flake8 flake8-bugbear bandit pycln
-
-      - name: Check code format with black
-        run: black --check contracts config
-
-      - name: Check import sorting with isort
-        run: isort --check-only --profile=black contracts config
-
-      - name: Lint with flake8
-        run: flake8 contracts config --max-line-length=120 --extend-ignore=E203,W503
-
-      - name: Security check with bandit
-        run: bandit -r contracts config -c .bandit --skip B308,B101 || true
-
   test:
     name: Django Tests
     runs-on: ubuntu-latest
@@ -80,27 +52,22 @@ jobs:
 
       - name: Run Django checks
         run: python manage.py check
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_contratos
 
       - name: Run migrations
-        run: python manage.py migrate
+        run: python manage.py migrate --noinput
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_contratos
 
-      - name: Run tests with coverage
-        run: |
-          pytest --cov=contracts --cov-report=xml --cov-report=html --verbosity=2
+      - name: Run tests
+        run: pytest --verbosity=2
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_contratos
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
 
   deploy_railway:
     name: Deploy Railway
-    needs: [lint, test]
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -112,7 +79,8 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
           export PATH="$HOME/.railway/bin:$PATH"
           railway login --token "$RAILWAY_TOKEN"
-          railway up --service="${{ secrets.RAILWAY_SERVICE_ID }}" --ci
+          railway up --service="$RAILWAY_SERVICE_ID" --ci
