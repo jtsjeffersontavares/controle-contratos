@@ -97,3 +97,22 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+
+  deploy_railway:
+    name: Deploy Railway
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: curl -fsSL https://railway.app/install.sh | sh
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          export PATH="$HOME/.railway/bin:$PATH"
+          railway login --token "$RAILWAY_TOKEN"
+          railway up --service="${{ secrets.RAILWAY_SERVICE_ID }}" --ci
