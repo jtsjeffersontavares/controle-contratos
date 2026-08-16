@@ -445,7 +445,10 @@ class Contract(TimeStampedModel):
 
     @property
     def committed_value(self):
-        return self.commitments.aggregate(total=Sum("value"))["total"] or Decimal("0")
+        total = Decimal("0")
+        for commitment in self.commitments.all():
+            total += commitment.total_value
+        return total
 
     @property
     def ordered_value(self):
@@ -606,6 +609,46 @@ class Commitment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.number} — {self.contract.number}"
+
+    @property
+    def total_value(self):
+        resource_total = self.resources.aggregate(total=Sum("value"))["total"]
+        if resource_total is not None:
+            return resource_total
+        return self.value or Decimal("0")
+
+    @property
+    def resource_count(self):
+        return self.resources.count()
+
+
+class CommitmentResource(TimeStampedModel):
+    commitment = models.ForeignKey(
+        Commitment,
+        verbose_name="empenho",
+        on_delete=models.CASCADE,
+        related_name="resources",
+    )
+    budget_action = models.CharField("ação orçamentária", max_length=60, blank=True)
+    ptres = models.CharField("PTRES", max_length=60, blank=True)
+    credit_origin = models.CharField("origem do crédito", max_length=120, blank=True)
+    pi = models.CharField("PI", max_length=80, blank=True)
+    value = models.DecimalField(
+        "valor do recurso",
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    notes = models.TextField("observações", blank=True)
+
+    class Meta:
+        ordering = ["pk"]
+        verbose_name = "Recurso do empenho"
+        verbose_name_plural = "Recursos do empenho"
+
+    def __str__(self):
+        return f"{self.commitment.number} — {self.ptres or self.pi or self.budget_action or 'recurso'}"
 
 
 class SupplyOrder(TimeStampedModel):
@@ -802,7 +845,9 @@ class ContractChange(TimeStampedModel):
         "tipo de alteração", max_length=20, choices=ChangeType.choices
     )
     number = models.CharField("número da alteração", max_length=100)
-    request_date = models.DateField("data da solicitação", auto_now_add=True)
+    request_date = models.DateField(
+        "data da solicitação", auto_now_add=True, null=True, blank=True
+    )
     item = models.ForeignKey(
         ContractItem,
         verbose_name="item",

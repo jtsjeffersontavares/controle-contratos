@@ -24,6 +24,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, T
 from .forms import (
     AdministrativeProcessForm,
     CommitmentForm,
+    CommitmentResourceFormSet,
     ContractChangeForm,
     ContractForm,
     ContractItemForm,
@@ -228,6 +229,7 @@ class ContractDetailView(LoginRequiredMixin, DetailView):
         ).prefetch_related(
             "items",
             "commitments__item",
+            "commitments__resources",
             "supply_orders__destination",
             "supply_orders__deliveries",
             "changes",
@@ -647,7 +649,12 @@ class CommitmentListView(SearchableListView):
     ]
 
     def get_queryset(self):
-        return super().get_queryset().select_related("contract", "item", "organization")
+        return (
+            super()
+            .get_queryset()
+            .select_related("contract", "item", "organization")
+            .prefetch_related("resources")
+        )
 
 
 class SupplyOrderListView(SearchableListView):
@@ -859,10 +866,29 @@ class CommitmentCreateView(RelatedCreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context["resource_formset"] = CommitmentResourceFormSet(
+                self.request.POST,
+                instance=self.object,
+            )
+        else:
+            context["resource_formset"] = CommitmentResourceFormSet(instance=self.object)
         context["commitment_item_data_url_template"] = reverse(
             "contract_item_data", args=[0]
         ).replace("/0/", "/__id__/")
         return context
+
+    def form_valid(self, form):
+        self.object = form.save()
+        context = self.get_context_data(form=form)
+        resource_formset = context["resource_formset"]
+        resource_formset.instance = self.object
+        if not resource_formset.is_valid():
+            return self.render_to_response(context)
+        resource_formset.save()
+        if not self.object.resources.exists() and self.object.value:
+            self.object.resources.create(value=self.object.value)
+        return redirect(self.get_success_url())
 
 
 class CommitmentUpdateView(RelatedUpdateView):
@@ -872,10 +898,29 @@ class CommitmentUpdateView(RelatedUpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context["resource_formset"] = CommitmentResourceFormSet(
+                self.request.POST,
+                instance=self.object,
+            )
+        else:
+            context["resource_formset"] = CommitmentResourceFormSet(instance=self.object)
         context["commitment_item_data_url_template"] = reverse(
             "contract_item_data", args=[0]
         ).replace("/0/", "/__id__/")
         return context
+
+    def form_valid(self, form):
+        self.object = form.save()
+        context = self.get_context_data(form=form)
+        resource_formset = context["resource_formset"]
+        resource_formset.instance = self.object
+        if not resource_formset.is_valid():
+            return self.render_to_response(context)
+        resource_formset.save()
+        if not self.object.resources.exists() and self.object.value:
+            self.object.resources.create(value=self.object.value)
+        return redirect(self.get_success_url())
 
 
 class SupplyOrderCreateView(RelatedCreateView):

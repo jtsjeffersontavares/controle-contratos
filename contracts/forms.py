@@ -4,6 +4,7 @@ from django.utils import timezone
 from .models import (
     AdministrativeProcess,
     Commitment,
+    CommitmentResource,
     Contract,
     ContractChange,
     ContractItem,
@@ -244,6 +245,28 @@ ProcurementItemDeliveryFormSet = forms.inlineformset_factory(
     ProcurementItem,
     ProcurementItemDelivery,
     fields=["destination", "quantity", "notes"],
+    extra=1,
+    can_delete=True,
+)
+
+
+class CommitmentResourceForm(StyledModelForm):
+    class Meta:
+        model = CommitmentResource
+        fields = [
+            "budget_action",
+            "ptres",
+            "credit_origin",
+            "pi",
+            "value",
+            "notes",
+        ]
+
+
+CommitmentResourceFormSet = forms.inlineformset_factory(
+    Commitment,
+    CommitmentResource,
+    form=CommitmentResourceForm,
     extra=1,
     can_delete=True,
 )

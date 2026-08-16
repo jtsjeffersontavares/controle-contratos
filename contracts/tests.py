@@ -11,6 +11,8 @@ from .forms import CommitmentForm, ContractForm
 from .import_service import import_preview, preview_workbook
 from .models import (
     AuditLog,
+    Commitment,
+    CommitmentResource,
     Contract,
     ContractItem,
     Delivery,
@@ -296,6 +298,55 @@ class CommitmentFormTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("item", form.errors)
+
+
+class CommitmentResourceTests(TestCase):
+    def test_contract_committed_value_sums_multiple_resource_rows(self):
+        supplier = Supplier.objects.create(name="EMPRESA RECURSOS")
+        org = Organization.objects.create(acronym="OM-REC", name="OM Recursos")
+        contract = Contract.objects.create(
+            number="001/RECURSOS/2026",
+            supplier=supplier,
+            managing_organization=org,
+            initial_value=Decimal("1000"),
+            current_value=Decimal("1000"),
+        )
+        item = ContractItem.objects.create(
+            contract=contract,
+            procurement_item="1",
+            description="Material com múltiplos recursos",
+            quantity=Decimal("10"),
+            unit="UN",
+            unit_value=Decimal("100"),
+        )
+        commitment = Commitment.objects.create(
+            contract=contract,
+            item=item,
+            organization=org,
+            number="NE-2026-008",
+            year=2026,
+            value=Decimal("100"),
+        )
+        CommitmentResource.objects.create(
+            commitment=commitment,
+            budget_action="1234.5678",
+            ptres="PTRES-A",
+            credit_origin="SDAP",
+            pi="PI-A",
+            value=Decimal("40"),
+        )
+        CommitmentResource.objects.create(
+            commitment=commitment,
+            budget_action="8765.4321",
+            ptres="PTRES-B",
+            credit_origin="SDAP",
+            pi="PI-B",
+            value=Decimal("60"),
+        )
+
+        self.assertEqual(commitment.total_value, Decimal("100"))
+        self.assertEqual(contract.committed_value, Decimal("100"))
+        self.assertEqual(contract.balance, Decimal("900"))
 
 
 class OrganizationFieldTests(TestCase):

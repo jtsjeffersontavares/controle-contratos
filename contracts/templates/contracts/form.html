@@ -4,6 +4,64 @@
 <form method="post" enctype="multipart/form-data" class="panel form-panel">{% csrf_token %}
   {% if form.non_field_errors %}<div class="message error">{{ form.non_field_errors }}</div>{% endif %}
   <div class="form-grid">{% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+  {% if resource_formset %}
+    <div class="panel" style="margin-top: 14px;">
+      <h2 style="margin-top:0">Recursos do empenho</h2>
+      <p class="hint">Adicione um ou mais recursos financeiros para compor o valor total desta nota de empenho.</p>
+      {{ resource_formset.management_form }}
+      {% if resource_formset.non_form_errors %}<div class="message error">{{ resource_formset.non_form_errors }}</div>{% endif %}
+      <div class="table-wrap" data-resource-formset>
+        <table>
+          <thead>
+            <tr>
+              <th>Ação</th>
+              <th>PTRES</th>
+              <th>Origem</th>
+              <th>PI</th>
+              <th>Valor</th>
+              <th>Obs.</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody data-resource-formset-body>
+            {% for resource_form in resource_formset %}
+              <tr data-resource-form-row>
+                {{ resource_form.id }}
+                <td>{{ resource_form.budget_action }}{{ resource_form.budget_action.errors }}</td>
+                <td>{{ resource_form.ptres }}{{ resource_form.ptres.errors }}</td>
+                <td>{{ resource_form.credit_origin }}{{ resource_form.credit_origin.errors }}</td>
+                <td>{{ resource_form.pi }}{{ resource_form.pi.errors }}</td>
+                <td>{{ resource_form.value }}{{ resource_form.value.errors }}</td>
+                <td>{{ resource_form.notes }}{{ resource_form.notes.errors }}</td>
+                <td>
+                  <span hidden>{{ resource_form.DELETE }}</span>
+                  <button type="button" class="button danger-link" data-resource-form-remove>Excluir</button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="form-actions" style="justify-content:flex-start;margin-top:1rem;">
+          <button type="button" class="button" data-resource-form-add>Adicionar recurso</button>
+        </div>
+        <template data-resource-form-template>
+          <tr data-resource-form-row>
+            {{ resource_formset.empty_form.id }}
+            <td>{{ resource_formset.empty_form.budget_action }}</td>
+            <td>{{ resource_formset.empty_form.ptres }}</td>
+            <td>{{ resource_formset.empty_form.credit_origin }}</td>
+            <td>{{ resource_formset.empty_form.pi }}</td>
+            <td>{{ resource_formset.empty_form.value }}</td>
+            <td>{{ resource_formset.empty_form.notes }}</td>
+            <td>
+              <span hidden>{{ resource_formset.empty_form.DELETE }}</span>
+              <button type="button" class="button danger-link" data-resource-form-remove>Excluir</button>
+            </td>
+          </tr>
+        </template>
+      </div>
+    </div>
+  {% endif %}
   {% if contract_create_mode %}
     <div class="panel" style="margin-top:14px">
       <h2 style="margin-top:0">Itens do pregão selecionado</h2>
@@ -142,6 +200,45 @@
   };
 
   // Executar toggleChangeFields depois que todo o DOM estiver pronto
+  const resourceFormset = document.querySelector('[data-resource-formset]');
+  if (resourceFormset) {
+    const body = resourceFormset.querySelector('[data-resource-formset-body]');
+    const template = resourceFormset.querySelector('[data-resource-form-template]');
+    const addButton = resourceFormset.querySelector('[data-resource-form-add]');
+    const totalFormsInput = resourceFormset.querySelector('input[name$="-TOTAL_FORMS"]');
+
+    const markForDeletion = (row) => {
+      const deleteInput = row.querySelector('input[name$="-DELETE"]');
+      if (deleteInput) {
+        deleteInput.checked = true;
+      }
+      row.hidden = true;
+    };
+
+    const bindRemoveButtons = (scope) => {
+      scope.querySelectorAll('[data-resource-form-remove]').forEach((removeButton) => {
+        removeButton.addEventListener('click', () => {
+          const row = removeButton.closest('[data-resource-form-row]');
+          if (row) {
+            markForDeletion(row);
+          }
+        });
+      });
+    };
+
+    const addForm = () => {
+      if (!template || !body || !totalFormsInput) return;
+      const formIndex = Number.parseInt(totalFormsInput.value, 10);
+      const fragment = template.innerHTML.replaceAll(/__prefix__/g, String(formIndex));
+      body.insertAdjacentHTML('beforeend', fragment);
+      totalFormsInput.value = String(formIndex + 1);
+      bindRemoveButtons(body);
+    };
+
+    bindRemoveButtons(body);
+    addButton?.addEventListener('click', addForm);
+  }
+
   if (changeTypeSelect) {
     changeTypeSelect.addEventListener('change', toggleChangeFields);
     // Executar uma vez no carregamento
