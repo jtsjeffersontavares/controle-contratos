@@ -231,7 +231,9 @@ class ProcurementItemForm(StyledModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["supplier"].help_text = (
-            "Selecione a empresa responsável por este item do pregão. Cada contrato é individual, então mesmo que seja o mesmo pregão e a mesma empresa, os itens podem variar."
+            "Selecione a empresa responsável por este item do pregão. "
+            "Cada contrato é individual, então mesmo que seja o mesmo "
+            "pregão e a mesma empresa, os itens podem variar."
         )
         self.fields["supplier"].queryset = Supplier.objects.filter(
             active=True
@@ -267,14 +269,50 @@ class CommitmentForm(StyledModelForm):
         ]
         widgets = {"issue_date": DATE_WIDGET, "notes": TEXTAREA_WIDGET}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["value"].required = False
+
     def clean(self):
         cleaned = super().clean()
         contract = cleaned.get("contract")
         item = cleaned.get("item")
+        quantity = cleaned.get("quantity")
+        value = cleaned.get("value")
+
         if contract and item and item.contract_id != contract.id:
             self.add_error(
                 "item", "O item selecionado não pertence ao contrato informado."
             )
+
+        if quantity is not None and quantity < 0:
+            self.add_error("quantity", "A quantidade empenhada não pode ser negativa.")
+
+        if value is not None and value < 0:
+            self.add_error("value", "O valor do empenho não pode ser negativo.")
+
+        if item and quantity is not None and value in (None, ""):
+            if item.unit_value is None or item.unit_value <= 0:
+                self.add_error(
+                    "item",
+                    "O item selecionado não possui valor unitário cadast"
+                    "rado para gerar o empenho.",
+                )
+            else:
+                cleaned["value"] = quantity * item.unit_value
+
+        if item and quantity is not None and value is not None and value > 0:
+            if item.unit_value is not None and item.unit_value > 0:
+                expected_value = quantity * item.unit_value
+                if value != expected_value and self.data.get("value") not in (None, ""):
+                    self.add_error(
+                        "value",
+                        "O valor informado diverge do valor unitário do item. "
+                        "Para manter a consistência, o valor deve refletir o "
+                        "item selecionado ou ser ajustado explicitamente pela "
+                        "exceção de negócio.",
+                    )
+
         return cleaned
 
 

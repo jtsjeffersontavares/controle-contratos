@@ -38,6 +38,7 @@ from .forms import (
     SupplierForm,
     SupplyOrderForm,
 )
+from .import_service import import_preview, preview_workbook
 from .models import (
     AdministrativeProcess,
     AuditLog,
@@ -596,6 +597,22 @@ class ProcurementItemDataView(LoginRequiredMixin, View):
         )
 
 
+class ContractItemDataView(LoginRequiredMixin, View):
+    """API endpoint que retorna os dados de um item do contrato em JSON."""
+
+    def get(self, request, pk):
+        item = get_object_or_404(ContractItem, pk=pk)
+        return JsonResponse(
+            {
+                "id": item.pk,
+                "contractId": item.contract_id,
+                "quantity": str(item.quantity or "0"),
+                "unit": item.unit or "UN",
+                "unitValue": str(item.unit_value or "0"),
+            }
+        )
+
+
 class SupplierListView(SearchableListView):
     model = Supplier
     template_name = "contracts/supplier_list.html"
@@ -840,11 +857,25 @@ class CommitmentCreateView(RelatedCreateView):
     form_class = CommitmentForm
     title = "Nova nota de empenho"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["commitment_item_data_url_template"] = reverse(
+            "contract_item_data", args=[0]
+        ).replace("/0/", "/__id__/")
+        return context
+
 
 class CommitmentUpdateView(RelatedUpdateView):
     model = Commitment
     form_class = CommitmentForm
     title = "Editar nota de empenho"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["commitment_item_data_url_template"] = reverse(
+            "contract_item_data", args=[0]
+        ).replace("/0/", "/__id__/")
+        return context
 
 
 class SupplyOrderCreateView(RelatedCreateView):

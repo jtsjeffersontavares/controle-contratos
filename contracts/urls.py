@@ -54,6 +54,11 @@ urlpatterns = [
         views.ProcurementItemDataView.as_view(),
         name="procurement_item_data",
     ),
+    path(
+        "itens-contrato/<int:pk>/dados/",
+        views.ContractItemDataView.as_view(),
+        name="contract_item_data",
+    ),
     path("contratos/", views.ContractListView.as_view(), name="contract_list"),
     path("contratos/novo/", views.ContractCreateView.as_view(), name="contract_create"),
     path(

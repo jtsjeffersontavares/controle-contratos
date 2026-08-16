@@ -7,11 +7,12 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import ContractForm
+from .forms import CommitmentForm, ContractForm
 from .import_service import import_preview, preview_workbook
 from .models import (
     AuditLog,
     Contract,
+    ContractItem,
     Delivery,
     Document,
     Organization,
@@ -226,6 +227,75 @@ class ContractModelTests(TestCase):
 
         copied_again = contract.copy_items_from_procurement()
         self.assertEqual(copied_again, 0)
+
+
+class CommitmentFormTests(TestCase):
+    def setUp(self):
+        self.supplier = Supplier.objects.create(name="EMPRESA EMPENHO")
+        self.organization = Organization.objects.create(
+            acronym="OM-EMPENHO",
+            name="Organização do Empenho",
+        )
+        self.contract = Contract.objects.create(
+            number="001/EMPENHO/2026",
+            supplier=self.supplier,
+            managing_organization=self.organization,
+            initial_value=Decimal("1000"),
+            current_value=Decimal("1000"),
+        )
+        self.item = ContractItem.objects.create(
+            contract=self.contract,
+            procurement_item="1",
+            description="Material teste",
+            quantity=Decimal("10"),
+            unit="UN",
+            unit_value=Decimal("25.50"),
+        )
+
+    def test_commitment_form_uses_item_unit_value_when_value_is_empty(self):
+        form = CommitmentForm(
+            data={
+                "contract": self.contract.pk,
+                "item": self.item.pk,
+                "organization": self.organization.pk,
+                "number": "NE-2026-001",
+                "year": "2026",
+                "issue_date": "2026-01-15",
+                "quantity": "2",
+                "value": "",
+                "budget_action": "1234.5678",
+                "ptres": "PTRES-01",
+                "credit_origin": "SDAP",
+                "pi": "PI-01",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["value"], Decimal("51.00"))
+
+    def test_commitment_form_rejects_items_without_unit_value(self):
+        self.item.unit_value = Decimal("0")
+        self.item.save(update_fields=["unit_value"])
+
+        form = CommitmentForm(
+            data={
+                "contract": self.contract.pk,
+                "item": self.item.pk,
+                "organization": self.organization.pk,
+                "number": "NE-2026-002",
+                "year": "2026",
+                "issue_date": "2026-01-16",
+                "quantity": "1",
+                "value": "",
+                "budget_action": "1234.5678",
+                "ptres": "PTRES-02",
+                "credit_origin": "SDAP",
+                "pi": "PI-02",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("item", form.errors)
 
 
 class OrganizationFieldTests(TestCase):
@@ -569,7 +639,7 @@ class ViewAndPermissionTests(TestCase):
     def test_contract_create_uses_procurement_object_and_hides_removed_fields(self):
         self.client.login(username="gestor", password="SenhaForte123!")
         supplier = Supplier.objects.create(name="EMPRESA CONTRATO NOVO")
-        org = Organization.objects.create(acronym="OM-CNT", name="OM Contrato")
+        Organization.objects.create(acronym="OM-CNT", name="OM Contrato")
         procurement = Procurement.objects.create(number="93000/2026")
         ProcurementItem.objects.create(
             procurement=procurement,
@@ -721,7 +791,7 @@ class ViewAndPermissionTests(TestCase):
         org = Organization.objects.create(acronym="OM-ITM", name="OM Item")
         procurement_a = Procurement.objects.create(number="94000/2026")
         procurement_b = Procurement.objects.create(number="95000/2026")
-        item_a = ProcurementItem.objects.create(
+        ProcurementItem.objects.create(
             procurement=procurement_a,
             item_number="1",
             model="Item do pregão A",
@@ -794,7 +864,7 @@ class ViewAndPermissionTests(TestCase):
             initial_value=Decimal("100"),
             current_value=Decimal("100"),
         )
-        invalid_item = other_contract.items.create(
+        other_contract.items.create(
             procurement_item="99",
             description="Item de outro contrato",
             quantity=Decimal("1"),

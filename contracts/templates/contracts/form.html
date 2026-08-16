@@ -24,6 +24,9 @@
 {% if procurement_item_data_url_template %}
   <script id="procurement-item-data-url-template" type="application/json">"{{ procurement_item_data_url_template|escapejs }}"</script>
 {% endif %}
+{% if commitment_item_data_url_template %}
+  <script id="commitment-item-data-url-template" type="application/json">"{{ commitment_item_data_url_template|escapejs }}"</script>
+{% endif %}
 <script>
 (() => {
   const currencyInputs = Array.from(document.querySelectorAll('input[data-currency="brl"]'));
@@ -263,6 +266,45 @@
     };
     originItemSelect.addEventListener('change', syncProcurementItemNumber);
     syncProcurementItemNumber();
+  }
+
+  const commitmentItemSelect = document.getElementById('id_item');
+  const commitmentValueInput = document.getElementById('id_value');
+  const commitmentQuantityInput = document.getElementById('id_quantity');
+  const commitmentItemDataTemplateRaw = document.getElementById('commitment-item-data-url-template');
+
+  if (commitmentItemSelect && commitmentValueInput && commitmentItemDataTemplateRaw) {
+    const template = JSON.parse(commitmentItemDataTemplateRaw.textContent || '""');
+
+    const fillCommitmentValue = async () => {
+      const itemId = commitmentItemSelect.value;
+      if (!itemId) {
+        commitmentValueInput.value = '';
+        return;
+      }
+
+      const url = template.replace('__id__', itemId);
+      try {
+        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('Falha ao carregar dados do item do contrato');
+        const data = await response.json();
+        const quantityValue = commitmentQuantityInput && commitmentQuantityInput.value ? commitmentQuantityInput.value.replace('.', '').replace(',', '.') : '0';
+        const quantity = Number.parseFloat(quantityValue) || 0;
+        const unitValue = Number.parseFloat(String(data.unitValue || '0').replace('.', '').replace(',', '.')) || 0;
+        if (commitmentValueInput.value === '' || commitmentValueInput.dataset.autoFilled === 'true') {
+          commitmentValueInput.value = (quantity * unitValue || 0).toFixed(2).replace('.', ',');
+          commitmentValueInput.dataset.autoFilled = 'true';
+        }
+      } catch (_error) {
+        console.error('Erro ao carregar valor do item do contrato:', _error);
+      }
+    };
+
+    commitmentItemSelect.addEventListener('change', fillCommitmentValue);
+    if (commitmentQuantityInput) {
+      commitmentQuantityInput.addEventListener('input', fillCommitmentValue);
+    }
+    fillCommitmentValue();
   }
 
   const contractCreateMarker = document.getElementById('procurement-summary-url-template');
