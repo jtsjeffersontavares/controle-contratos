@@ -629,6 +629,7 @@ class CommitmentResource(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="resources",
     )
+    number = models.CharField("nota de empenho", max_length=100, blank=True)
     budget_action = models.CharField("ação orçamentária", max_length=60, blank=True)
     ptres = models.CharField("PTRES", max_length=60, blank=True)
     credit_origin = models.CharField("origem do crédito", max_length=120, blank=True)
@@ -648,7 +649,7 @@ class CommitmentResource(TimeStampedModel):
         verbose_name_plural = "Recursos do empenho"
 
     def __str__(self):
-        return f"{self.commitment.number} — {self.ptres or self.pi or self.budget_action or 'recurso'}"
+        return f"{self.commitment.number} — {self.number or self.ptres or self.pi or self.budget_action or 'recurso'}"
 
 
 class SupplyOrder(TimeStampedModel):

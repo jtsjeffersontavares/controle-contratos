@@ -254,6 +254,7 @@ class CommitmentResourceForm(StyledModelForm):
     class Meta:
         model = CommitmentResource
         fields = [
+            "number",
             "budget_action",
             "ptres",
             "credit_origin",
@@ -278,7 +279,6 @@ class CommitmentForm(StyledModelForm):
         fields = [
             "contract",
             "item",
-            "organization",
             "number",
             "year",
             "issue_date",

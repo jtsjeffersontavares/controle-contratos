@@ -327,16 +327,18 @@ class CommitmentResourceTests(TestCase):
             year=2026,
             value=Decimal("100"),
         )
-        CommitmentResource.objects.create(
+        resource_a = CommitmentResource.objects.create(
             commitment=commitment,
+            number="NE-2026-008A",
             budget_action="1234.5678",
             ptres="PTRES-A",
             credit_origin="SDAP",
             pi="PI-A",
             value=Decimal("40"),
         )
-        CommitmentResource.objects.create(
+        resource_b = CommitmentResource.objects.create(
             commitment=commitment,
+            number="NE-2026-008B",
             budget_action="8765.4321",
             ptres="PTRES-B",
             credit_origin="SDAP",
@@ -344,6 +346,8 @@ class CommitmentResourceTests(TestCase):
             value=Decimal("60"),
         )
 
+        self.assertEqual(resource_a.number, "NE-2026-008A")
+        self.assertEqual(resource_b.number, "NE-2026-008B")
         self.assertEqual(commitment.total_value, Decimal("100"))
         self.assertEqual(contract.committed_value, Decimal("100"))
         self.assertEqual(contract.balance, Decimal("900"))
