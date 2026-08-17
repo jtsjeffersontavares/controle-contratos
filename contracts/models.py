@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -210,7 +209,8 @@ class ProcurementItem(TimeStampedModel):
         verbose_name_plural = "Itens do pregão"
 
     def __str__(self):
-        return f'{self.procurement.number} — Item {self.item_number} — {self.nomenclature or self.model or self.brand or "Item"}'
+        item_label = self.nomenclature or self.model or self.brand or "Item"
+        return f"{self.procurement.number} — Item {self.item_number} — {item_label}"
 
     def clean(self):
         super().clean()
@@ -553,6 +553,28 @@ class ContractItem(TimeStampedModel):
     @property
     def total_value(self):
         return self.quantity * self.unit_value
+
+    @property
+    def committed_quantity(self):
+        return sum(
+            (commitment.quantity for commitment in self.commitments.all()),
+            Decimal("0"),
+        )
+
+    @property
+    def committed_value(self):
+        return sum(
+            (commitment.total_value for commitment in self.commitments.all()),
+            Decimal("0"),
+        )
+
+    @property
+    def available_quantity(self):
+        return max(Decimal("0"), self.quantity - self.committed_quantity)
+
+    @property
+    def available_value(self):
+        return max(Decimal("0"), self.total_value - self.committed_value)
 
 
 class Commitment(TimeStampedModel):

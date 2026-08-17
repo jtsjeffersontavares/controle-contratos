@@ -14,15 +14,15 @@ def _has_group(user, groups):
 
 
 def user_can_edit(user):
-    return _has_group(user, EDIT_GROUPS) or bool(user and user.is_staff)
+    return _has_group(user, EDIT_GROUPS) or bool(user and user.is_superuser)
 
 
 def user_can_manage(user):
-    return _has_group(user, MANAGEMENT_GROUPS) or bool(user and user.is_staff)
+    return _has_group(user, MANAGEMENT_GROUPS) or bool(user and user.is_superuser)
 
 
 def user_is_admin(user):
-    return _has_group(user, ADMIN_GROUPS) or bool(user and user.is_staff)
+    return _has_group(user, ADMIN_GROUPS) or bool(user and user.is_superuser)
 
 
 class EditorRequiredMixin(UserPassesTestMixin):

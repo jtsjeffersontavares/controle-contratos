@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import CommitmentForm, ContractForm
+from .forms import CommitmentForm, CommitmentResourceFormSet, ContractForm
 from .import_service import import_preview, preview_workbook
 from .models import (
     AuditLog,
@@ -254,7 +254,7 @@ class CommitmentFormTests(TestCase):
             unit_value=Decimal("25.50"),
         )
 
-    def test_commitment_form_uses_item_unit_value_when_value_is_empty(self):
+    def test_commitment_form_keeps_value_blank_until_user_fills_it(self):
         form = CommitmentForm(
             data={
                 "contract": self.contract.pk,
@@ -273,12 +273,9 @@ class CommitmentFormTests(TestCase):
         )
 
         self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data["value"], Decimal("51.00"))
+        self.assertIsNone(form.cleaned_data["value"])
 
-    def test_commitment_form_rejects_items_without_unit_value(self):
-        self.item.unit_value = Decimal("0")
-        self.item.save(update_fields=["unit_value"])
-
+    def test_commitment_form_allows_manual_value_even_when_item_has_unit_value(self):
         form = CommitmentForm(
             data={
                 "contract": self.contract.pk,
@@ -288,7 +285,7 @@ class CommitmentFormTests(TestCase):
                 "year": "2026",
                 "issue_date": "2026-01-16",
                 "quantity": "1",
-                "value": "",
+                "value": "25.50",
                 "budget_action": "1234.5678",
                 "ptres": "PTRES-02",
                 "credit_origin": "SDAP",
@@ -296,8 +293,56 @@ class CommitmentFormTests(TestCase):
             }
         )
 
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["value"], Decimal("25.50"))
+
+    def test_commitment_form_rejects_total_above_item_limit(self):
+        Commitment.objects.create(
+            contract=self.contract,
+            item=self.item,
+            organization=self.organization,
+            number="NE-2026-010",
+            year=2026,
+            value=Decimal("200.00"),
+        )
+        self.item.quantity = Decimal("10")
+        self.item.unit_value = Decimal("100")
+        self.item.save(update_fields=["quantity", "unit_value"])
+
+        form = CommitmentForm(
+            data={
+                "contract": self.contract.pk,
+                "item": self.item.pk,
+                "organization": self.organization.pk,
+                "number": "NE-2026-011",
+                "year": "2026",
+                "issue_date": "2026-01-20",
+                "quantity": "1",
+                "value": "900.00",
+                "budget_action": "1234.5678",
+                "ptres": "PTRES-03",
+                "credit_origin": "SDAP",
+                "pi": "PI-03",
+            }
+        )
+
         self.assertFalse(form.is_valid())
-        self.assertIn("item", form.errors)
+        self.assertIn("value", form.errors)
+        self.assertIn("saldo disponível", form.errors["value"][0])
+
+    def test_commitment_resource_formset_starts_empty(self):
+        commitment = Commitment.objects.create(
+            contract=self.contract,
+            item=self.item,
+            organization=self.organization,
+            number="NE-2026-003",
+            year=2026,
+            value=Decimal("10.00"),
+        )
+
+        formset = CommitmentResourceFormSet(instance=commitment)
+
+        self.assertEqual(formset.total_form_count(), 0)
 
 
 class CommitmentResourceTests(TestCase):
@@ -419,6 +464,11 @@ class ViewAndPermissionTests(TestCase):
                 )
                 anonymous = self.client.get(document.file.url)
                 self.assertEqual(anonymous.status_code, 302)
+
+                self.client.login(username="consulta", password="SenhaForte123!")
+                forbidden = self.client.get(document.file.url)
+                self.assertEqual(forbidden.status_code, 403)
+
                 self.client.login(username="gestor", password="SenhaForte123!")
                 response = self.client.get(document.file.url)
                 self.assertEqual(response.status_code, 200)

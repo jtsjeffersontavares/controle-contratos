@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -26,10 +28,16 @@ def env_bool(name: str, default: bool = False) -> bool:
     return value in {"1", "true", "yes", "sim", "on"}
 
 
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY", "troque-esta-chave-antes-do-uso-em-producao"
-)
 DEBUG = env_bool("DJANGO_DEBUG", True)
+
+if os.getenv("DJANGO_SECRET_KEY"):
+    SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+elif DEBUG:
+    SECRET_KEY = "development-only-secret-key"
+else:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY deve ser definido em ambiente de produção."
+    )
 
 allowed_hosts = [
     host.strip()
@@ -216,15 +224,15 @@ LOGOUT_REDIRECT_URL = "login"
 FILE_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024
 
-SESSION_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", False)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", not DEBUG)
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
-SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
 SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https")
-    if env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+    if env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
     else None
 )
-USE_X_FORWARDED_HOST = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+USE_X_FORWARDED_HOST = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
 SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "0"))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 SECURE_HSTS_PRELOAD = False

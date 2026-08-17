@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.utils import timezone
 
@@ -268,7 +270,7 @@ CommitmentResourceFormSet = forms.inlineformset_factory(
     Commitment,
     CommitmentResource,
     form=CommitmentResourceForm,
-    extra=1,
+    extra=0,
     can_delete=True,
 )
 
@@ -314,27 +316,39 @@ class CommitmentForm(StyledModelForm):
         if value is not None and value < 0:
             self.add_error("value", "O valor do empenho não pode ser negativo.")
 
-        if item and quantity is not None and value in (None, ""):
-            if item.unit_value is None or item.unit_value <= 0:
+        if item and quantity is not None and quantity > 0:
+            current_pk = (
+                self.instance.pk if getattr(self.instance, "pk", None) else None
+            )
+            current_quantity = sum(
+                (
+                    commitment.quantity
+                    for commitment in item.commitments.exclude(pk=current_pk).all()
+                ),
+                Decimal("0"),
+            )
+            if current_quantity + quantity > item.quantity + Decimal("0.01"):
                 self.add_error(
-                    "item",
-                    "O item selecionado não possui valor unitário cadast"
-                    "rado para gerar o empenho.",
+                    "quantity",
+                    "A quantidade empenhada ultrapassa o saldo disponível do item.",
                 )
-            else:
-                cleaned["value"] = quantity * item.unit_value
 
-        if item and quantity is not None and value is not None and value > 0:
-            if item.unit_value is not None and item.unit_value > 0:
-                expected_value = quantity * item.unit_value
-                if value != expected_value and self.data.get("value") not in (None, ""):
-                    self.add_error(
-                        "value",
-                        "O valor informado diverge do valor unitário do item. "
-                        "Para manter a consistência, o valor deve refletir o "
-                        "item selecionado ou ser ajustado explicitamente pela "
-                        "exceção de negócio.",
-                    )
+        if item and value is not None and value > 0:
+            current_pk = (
+                self.instance.pk if getattr(self.instance, "pk", None) else None
+            )
+            current_value = sum(
+                (
+                    commitment.total_value
+                    for commitment in item.commitments.exclude(pk=current_pk).all()
+                ),
+                Decimal("0"),
+            )
+            if current_value + value > item.total_value + Decimal("0.01"):
+                self.add_error(
+                    "value",
+                    "O valor informado ultrapassa o saldo disponível do item.",
+                )
 
         return cleaned
 

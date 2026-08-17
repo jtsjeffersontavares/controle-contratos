@@ -12,6 +12,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Sum
 from django.forms.utils import ErrorList
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -57,7 +58,7 @@ from .models import (
     Supplier,
     SupplyOrder,
 )
-from .permissions import EditorRequiredMixin, ManagerRequiredMixin
+from .permissions import EditorRequiredMixin, ManagerRequiredMixin, user_can_edit
 from .xlsx_utils import write_simple_xlsx
 
 
@@ -872,7 +873,9 @@ class CommitmentCreateView(RelatedCreateView):
                 instance=self.object,
             )
         else:
-            context["resource_formset"] = CommitmentResourceFormSet(instance=self.object)
+            context["resource_formset"] = CommitmentResourceFormSet(
+                instance=self.object
+            )
         context["commitment_item_data_url_template"] = reverse(
             "contract_item_data", args=[0]
         ).replace("/0/", "/__id__/")
@@ -904,7 +907,9 @@ class CommitmentUpdateView(RelatedUpdateView):
                 instance=self.object,
             )
         else:
-            context["resource_formset"] = CommitmentResourceFormSet(instance=self.object)
+            context["resource_formset"] = CommitmentResourceFormSet(
+                instance=self.object
+            )
         context["commitment_item_data_url_template"] = reverse(
             "contract_item_data", args=[0]
         ).replace("/0/", "/__id__/")
@@ -1535,6 +1540,11 @@ class HelpView(LoginRequiredMixin, TemplateView):
 
 class ProtectedMediaView(LoginRequiredMixin, View):
     def get(self, request, path):
+        if not user_can_edit(request.user):
+            raise PermissionDenied(
+                "Você não tem permissão para acessar este documento."
+            )
+
         media_root = Path(settings.MEDIA_ROOT).resolve()
         requested = (media_root / path).resolve()
         try:
